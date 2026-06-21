@@ -6,6 +6,11 @@ const OPT_TTL = 2500
 const ACTIVE_TTL = 3000
 const STALL_MS = 2000 // no snapshot for this long (while connected) => the stream is stalled / state unknown
 
+// Anomalies hidden from the dashboard UI for now. They stay fully registered + applyable in-engine (the
+// server still emits them in the catalog/active/pool); the dashboard simply filters them out of its inject
+// dropdown and the auto pool. Empty this set to surface them again.
+export const HIDDEN_ANOMALY_IDS = new Set(['lod_corruption', 'lod_popping', 'time_dilation', 'lighting_mismatch'])
+
 function resolvePath(obj: unknown, path: string): unknown {
   return path.split('.').reduce<unknown>((o, k) => (o == null ? undefined : (o as Record<string, unknown>)[k]), obj)
 }
@@ -140,7 +145,7 @@ export const useStore = create<AppState>((set, get) => ({
       return { snapshot: s, optimistic, pendingInjects, pendingReverts, events, lastSnapshotAt: now, stalled: false }
     }),
 
-  setCatalog: (c) => set({ catalog: c }),
+  setCatalog: (c) => set({ catalog: c.filter((e) => !HIDDEN_ANOMALY_IDS.has(e.id)) }),
   setFrame: (f) => {
     const prev = get().frame
     if (prev?.bitmap) prev.bitmap.close()
