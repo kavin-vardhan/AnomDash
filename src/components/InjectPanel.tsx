@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useStore } from '../store'
+import { useStore, useLive } from '../store'
 import { client } from '../transport/AnomalyClient'
 import { ArgControls } from './ArgControls'
 import type { CatalogEntry } from '../types'
@@ -12,6 +12,7 @@ export function InjectPanel() {
   const selected = useStore((s) => s.selectedActor)
   const selectActor = useStore((s) => s.selectActor)
   const addPendingInject = useStore((s) => s.addPendingInject)
+  const { live } = useLive()
 
   const [anomalyId, setAnomalyId] = useState<string>('')
   const [componentTarget, setComponentTarget] = useState('')
@@ -42,7 +43,7 @@ export function InjectPanel() {
   const scope = entry.scope
   const requiredMissing = entry.args.some((a) => a.required && !(args[a.name] ?? a.default).trim())
   const targetMissing = scope === 'object' ? !selected : scope === 'component' ? !componentTarget.trim() : false
-  const canInject = !requiredMissing && !targetMissing
+  const canInject = live && !requiredMissing && !targetMissing
 
   const doInject = () => {
     if (!canInject) return
@@ -54,8 +55,9 @@ export function InjectPanel() {
     const argv = entry.args.map((a) => args[a.name] ?? a.default)
     while (argv.length && argv[argv.length - 1].trim() === '') argv.pop() // trim trailing empty optionals
 
-    client.inject(entry.id, target, argv)
-    addPendingInject(entry.id, displayTarget, 'manual') // optimistic: reflect in ActivePanel immediately
+    if (client.inject(entry.id, target, argv)) {
+      addPendingInject(entry.id, displayTarget, 'manual') // optimistic only if the command actually went out
+    }
   }
 
   return (
@@ -97,8 +99,8 @@ export function InjectPanel() {
 
       <div className="btn-row">
         <button disabled={!canInject} onClick={doInject}>Inject</button>
-        <button onClick={() => { useStore.getState().addPendingReverts([entry.id]); client.revert(entry.id) }}>Revert</button>
-        <button className="danger" onClick={() => client.revertAll()}>Revert all</button>
+        <button disabled={!live} onClick={() => { if (client.revert(entry.id)) useStore.getState().addPendingReverts([entry.id]) }}>Revert</button>
+        <button className="danger" disabled={!live} onClick={() => client.revertAll()}>Revert all</button>
       </div>
       {targetMissing && <div className="warn small">pick a target</div>}
       {requiredMissing && <div className="warn small">a required arg is empty</div>}

@@ -1,4 +1,4 @@
-import { useStore } from '../store'
+import { useStore, useLive } from '../store'
 import { client } from '../transport/AnomalyClient'
 
 export function ActivePanel() {
@@ -7,6 +7,7 @@ export function ActivePanel() {
   const pendingInjects = useStore((s) => s.pendingInjects)
   const pendingReverts = useStore((s) => s.pendingReverts)
   const addPendingReverts = useStore((s) => s.addPendingReverts)
+  const { live } = useLive()
 
   const revertingIds = new Set(pendingReverts.map((r) => r.id))
   const activeIds = new Set(active.map((a) => a.id))
@@ -17,8 +18,8 @@ export function ActivePanel() {
   // (manual/global injects simply show no countdown). Pure client — no server change.
   const countdown = (id: string): number | undefined => liveFires.find((f) => f.id === id)?.secondsRemaining
 
-  const revertOne = (id: string) => { addPendingReverts([id]); client.revert(id) }
-  const revertAll = () => { addPendingReverts(active.map((a) => a.id)); client.revertAll() }
+  const revertOne = (id: string) => { if (client.revert(id)) addPendingReverts([id]) }
+  const revertAll = () => { if (client.revertAll()) addPendingReverts(active.map((a) => a.id)) }
 
   const total = shown.length + pendingShown.length
 
@@ -37,7 +38,7 @@ export function ActivePanel() {
               <div className="arow-meta">
                 <span className={`src ${a.source}`}>{a.source}</span>
                 <span className="dim">{a.tActive.toFixed(1)}s{cd !== undefined ? ` · ${cd.toFixed(1)}s left` : ''}</span>
-                <button onClick={() => revertOne(a.id)}>revert</button>
+                <button disabled={!live} onClick={() => revertOne(a.id)}>revert</button>
               </div>
             </div>
           )
@@ -53,7 +54,7 @@ export function ActivePanel() {
         ))}
         {total === 0 && <div className="empty">no active anomalies</div>}
       </div>
-      <button className="danger" disabled={!active.length} onClick={revertAll}>Revert all</button>
+      <button className="danger" disabled={!live || !active.length} onClick={revertAll}>Revert all</button>
     </div>
   )
 }

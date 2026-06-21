@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useStore, useControlValue } from '../store'
+import { useStore, useControlValue, useLive } from '../store'
 import { client } from '../transport/AnomalyClient'
 import { basename } from '../lib/format'
 
@@ -13,17 +13,16 @@ export function CapturePanel() {
   const [seed, setSeed] = useState('')
 
   const running = useControlValue<boolean>('capture.running', cap?.running ?? false)
+  const { live } = useLive()
 
   const start = () => {
     const opts: Record<string, unknown> = { format }
     if (dir.trim()) opts.dir = dir.trim()
     if (seed.trim() && !Number.isNaN(Number(seed))) opts.seed = Number(seed)
-    setOptimistic('capture.running', true)
-    client.captureStart(opts)
+    if (client.captureStart(opts)) setOptimistic('capture.running', true)
   }
   const stop = () => {
-    setOptimistic('capture.running', false)
-    client.captureStop()
+    if (client.captureStop()) setOptimistic('capture.running', false)
   }
 
   return (
@@ -53,8 +52,8 @@ export function CapturePanel() {
 
       <div className="cap-controls">
         {!running
-          ? <button onClick={start}>Start capture</button>
-          : <button className="danger" onClick={stop}>Stop capture</button>}
+          ? <button disabled={!live} onClick={start}>Start capture</button>
+          : <button className="danger" disabled={!live} onClick={stop}>Stop capture</button>}
       </div>
 
       {running && cap && (

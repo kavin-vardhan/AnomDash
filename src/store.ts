@@ -4,6 +4,7 @@ import type { Snapshot, CatalogEntry, FrameData, ConnState, EventEntry } from '.
 const MAX_EVENTS = 300
 const OPT_TTL = 2500
 const ACTIVE_TTL = 3000
+const STALL_MS = 2000 // no snapshot for this long (while connected) => the stream is stalled / state unknown
 
 function resolvePath(obj: unknown, path: string): unknown {
   return path.split('.').reduce<unknown>((o, k) => (o == null ? undefined : (o as Record<string, unknown>)[k]), obj)
@@ -65,6 +66,8 @@ interface AppState {
   catalog: CatalogEntry[]
   frame: FrameData | null
   lastCaptureStopped: CaptureStopped | null
+  lastSnapshotAt: number // ms timestamp of the last snapshot (0 = none yet)
+  stalled: boolean       // connected but no snapshot for STALL_MS => engine state unknown
 
   selectedActor: string | null
   overlay: { boxes: boolean; labels: boolean; active: boolean }
@@ -86,6 +89,7 @@ interface AppState {
   setOptimistic: (path: string, value: unknown, ttlMs?: number) => void
   addPendingInject: (id: string, target: string, source?: string) => void
   addPendingReverts: (ids: string[]) => void
+  tick: () => void // timer-driven: expire stale optimistic + recompute the stall flag (independent of snapshots)
   hardReset: () => void
 }
 
@@ -98,6 +102,8 @@ export const useStore = create<AppState>((set, get) => ({
   catalog: [],
   frame: null,
   lastCaptureStopped: null,
+  lastSnapshotAt: 0,
+  stalled: false,
   selectedActor: null,
   overlay: { boxes: true, labels: true, active: true },
   events: [],
@@ -131,7 +137,7 @@ export const useStore = create<AppState>((set, get) => ({
       let events = st.events
       for (const d of deriveSnapshotEvents(st.snapshot, s)) events = appendEvent(events, d.kind, d.text)
 
-      return { snapshot: s, optimistic, pendingInjects, pendingReverts, events }
+      return { snapshot: s, optimistic, pendingInjects, pendingReverts, events, lastSnapshotAt: now, stalled: false }
     }),
 
   setCatalog: (c) => set({ catalog: c }),
@@ -157,15 +163,41 @@ export const useStore = create<AppState>((set, get) => ({
       return { pendingReverts: [...st.pendingReverts, ...ids.filter((id) => !have.has(id)).map((id) => ({ id, at: now }))] }
     }),
 
+  tick: () =>
+    set((st) => {
+      const now = Date.now()
+      // Expire stale optimistic entries even when NO snapshot is arriving (a stalled stream otherwise never
+      // reconciles them) — the control then falls back to the last snapshot value, and the stall banner warns.
+      let optimistic = st.optimistic
+      let pruned = false
+      const kept: Record<string, Optimistic> = {}
+      for (const [k, e] of Object.entries(st.optimistic)) {
+        if (now <= e.until) kept[k] = e
+        else pruned = true
+      }
+      if (pruned) optimistic = kept
+      const stalled = st.conn === 'connected' && st.lastSnapshotAt > 0 && now - st.lastSnapshotAt > STALL_MS
+      if (!pruned && stalled === st.stalled) return {}
+      return { optimistic, stalled }
+    }),
+
   hardReset: () => {
     const prev = get().frame
     if (prev?.bitmap) prev.bitmap.close()
     set({
       conn: 'disconnected', everConnected: false, snapshot: null, frame: null, catalog: [],
       selectedActor: null, optimistic: {}, pendingInjects: [], pendingReverts: [],
+      lastSnapshotAt: 0, stalled: false,
     })
   },
 }))
+
+// Connection liveness for the UI: controls are "live" only when connected AND the stream isn't stalled.
+export function useLive() {
+  const conn = useStore((s) => s.conn)
+  const stalled = useStore((s) => s.stalled)
+  return { connected: conn === 'connected', stalled, live: conn === 'connected' && !stalled }
+}
 
 export function useControlValue<T>(path: string, fallback: T): T {
   const opt = useStore((s) => s.optimistic[path])
