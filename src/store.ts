@@ -2,47 +2,84 @@ import { create } from 'zustand'
 import type { Snapshot, CatalogEntry, FrameData, ConnState, EventEntry } from './types'
 
 const MAX_EVENTS = 300
-const OPT_TTL = 2500 // ms an optimistic scalar persists before the snapshot wins on mismatch
-const ACTIVE_TTL = 3000 // ms a pending inject/revert persists before the snapshot wins
+const OPT_TTL = 2500
+const ACTIVE_TTL = 3000
 
-// Resolve a dotted path (e.g. "session.pollRadius") against the snapshot.
 function resolvePath(obj: unknown, path: string): unknown {
   return path.split('.').reduce<unknown>((o, k) => (o == null ? undefined : (o as Record<string, unknown>)[k]), obj)
+}
+
+function appendEvent(events: EventEntry[], kind: string, text: string): EventEntry[] {
+  const base = events.length >= MAX_EVENTS ? events.slice(-(MAX_EVENTS - 1)) : events.slice()
+  base.push({ t: Date.now(), kind, text })
+  return base
+}
+
+// Plain-language activity from snapshot deltas — no raw acks / epoch / opcode noise.
+function deriveSnapshotEvents(prev: Snapshot | null, next: Snapshot): Array<{ kind: string; text: string }> {
+  const out: Array<{ kind: string; text: string }> = []
+  if (!prev) return out
+
+  const prevActive = new Map(prev.active.map((a) => [a.id, a]))
+  const nextActive = new Map(next.active.map((a) => [a.id, a]))
+  for (const [id, a] of nextActive) {
+    if (!prevActive.has(id)) {
+      out.push(
+        a.source === 'auto'
+          ? { kind: 'auto', text: `auto fired ${id}${a.target ? ` on ${a.target}` : ''}` }
+          : { kind: 'inject', text: `injected ${id}${a.target ? ` on ${a.target}` : ''}` },
+      )
+    }
+  }
+  for (const [id, a] of prevActive) {
+    if (!nextActive.has(id)) {
+      out.push(a.source === 'auto' ? { kind: 'auto', text: `${id} auto-reverted` } : { kind: 'inject', text: `reverted ${id}` })
+    }
+  }
+  if (prev.auto.running !== next.auto.running) {
+    out.push({ kind: 'auto', text: next.auto.running ? 'auto-injection started' : 'auto-injection stopped' })
+  }
+  if (prev.capture.running !== next.capture.running) {
+    out.push(
+      next.capture.running
+        ? { kind: 'capture', text: 'capture started' }
+        : { kind: 'capture', text: `capture complete (${next.capture.framesWritten} frames saved)` },
+    )
+  }
+  return out
 }
 
 interface Optimistic { value: unknown; until: number }
 interface PendingInject { id: string; target: string; source: string; at: number }
 interface PendingRevert { id: string; at: number }
+interface CaptureStopped { runDir: string; frames: number; seed: number; at: number }
 
 interface AppState {
-  // connection
   conn: ConnState
   everConnected: boolean
   wsUrl: string
   token: string
   lastError?: string
 
-  // data (latest only)
   snapshot: Snapshot | null
   catalog: CatalogEntry[]
   frame: FrameData | null
+  lastCaptureStopped: CaptureStopped | null
 
-  // ui-local
   selectedActor: string | null
   overlay: { boxes: boolean; labels: boolean; active: boolean }
   events: EventEntry[]
 
-  // OPTIMISTIC UI (standing rule): controls update instantly; the snapshot reconciles.
-  optimistic: Record<string, Optimistic> // scalar controls keyed by snapshot path
-  pendingInjects: PendingInject[] // injects shown immediately until active[] confirms
-  pendingReverts: PendingRevert[] // reverts hidden immediately until active[] confirms
+  optimistic: Record<string, Optimistic>
+  pendingInjects: PendingInject[]
+  pendingReverts: PendingRevert[]
 
-  // setters
   setConn: (c: ConnState, err?: string) => void
   setCreds: (wsUrl: string, token: string) => void
   setSnapshot: (s: Snapshot) => void
   setCatalog: (c: CatalogEntry[]) => void
   setFrame: (f: FrameData) => void
+  setCaptureStopped: (d: CaptureStopped) => void
   selectActor: (name: string | null) => void
   toggleOverlay: (k: 'boxes' | 'labels' | 'active') => void
   pushEvent: (kind: string, text: string) => void
@@ -60,6 +97,7 @@ export const useStore = create<AppState>((set, get) => ({
   snapshot: null,
   catalog: [],
   frame: null,
+  lastCaptureStopped: null,
   selectedActor: null,
   overlay: { boxes: true, labels: true, active: true },
   events: [],
@@ -68,22 +106,32 @@ export const useStore = create<AppState>((set, get) => ({
   pendingReverts: [],
 
   setConn: (c, err) =>
-    set((st) => ({ conn: c, lastError: err, everConnected: st.everConnected || c === 'connected' })),
+    set((st) => {
+      let events = st.events
+      if (c === 'connected' && st.conn !== 'connected') {
+        events = appendEvent(events, 'system', st.everConnected ? 'connection restored' : 'connected to server')
+      } else if (c === 'disconnected' && st.everConnected && st.conn !== 'disconnected') {
+        events = appendEvent(events, 'system', 'connection lost — reconnecting…')
+      }
+      return { conn: c, lastError: err, everConnected: st.everConnected || c === 'connected', events }
+    }),
   setCreds: (wsUrl, token) => set({ wsUrl, token }),
 
   setSnapshot: (s) =>
     set((st) => {
       const now = Date.now()
-      // Reconcile optimistic scalars: drop once the snapshot confirms the value, or after the TTL.
       const optimistic: Record<string, Optimistic> = {}
       for (const [path, e] of Object.entries(st.optimistic)) {
         if (now <= e.until && resolvePath(s, path) !== e.value) optimistic[path] = e
       }
-      // Reconcile the active overlay.
       const activeIds = new Set(s.active.map((a) => a.id))
       const pendingInjects = st.pendingInjects.filter((p) => !activeIds.has(p.id) && now - p.at < ACTIVE_TTL)
       const pendingReverts = st.pendingReverts.filter((r) => activeIds.has(r.id) && now - r.at < ACTIVE_TTL)
-      return { snapshot: s, optimistic, pendingInjects, pendingReverts }
+
+      let events = st.events
+      for (const d of deriveSnapshotEvents(st.snapshot, s)) events = appendEvent(events, d.kind, d.text)
+
+      return { snapshot: s, optimistic, pendingInjects, pendingReverts, events }
     }),
 
   setCatalog: (c) => set({ catalog: c }),
@@ -92,10 +140,11 @@ export const useStore = create<AppState>((set, get) => ({
     if (prev?.bitmap) prev.bitmap.close()
     set({ frame: f })
   },
+  setCaptureStopped: (d) =>
+    set((st) => ({ lastCaptureStopped: d, events: appendEvent(st.events, 'capture', `run complete — ${d.frames} frames saved`) })),
   selectActor: (name) => set({ selectedActor: name }),
   toggleOverlay: (k) => set((st) => ({ overlay: { ...st.overlay, [k]: !st.overlay[k] } })),
-  pushEvent: (kind, text) =>
-    set((st) => ({ events: [...st.events.slice(-(MAX_EVENTS - 1)), { t: Date.now(), kind, text }] })),
+  pushEvent: (kind, text) => set((st) => ({ events: appendEvent(st.events, kind, text) })),
 
   setOptimistic: (path, value, ttlMs = OPT_TTL) =>
     set((st) => ({ optimistic: { ...st.optimistic, [path]: { value, until: Date.now() + ttlMs } } })),
@@ -103,10 +152,9 @@ export const useStore = create<AppState>((set, get) => ({
     set((st) => ({ pendingInjects: [...st.pendingInjects.filter((p) => p.id !== id), { id, target, source, at: Date.now() }] })),
   addPendingReverts: (ids) =>
     set((st) => {
-      const now = Date.now()
       const have = new Set(st.pendingReverts.map((r) => r.id))
-      const add = ids.filter((id) => !have.has(id)).map((id) => ({ id, at: now }))
-      return { pendingReverts: [...st.pendingReverts, ...add] }
+      const now = Date.now()
+      return { pendingReverts: [...st.pendingReverts, ...ids.filter((id) => !have.has(id)).map((id) => ({ id, at: now }))] }
     }),
 
   hardReset: () => {
@@ -119,7 +167,6 @@ export const useStore = create<AppState>((set, get) => ({
   },
 }))
 
-// Optimistic-aware read: the optimistic value (if pending) else the snapshot fallback.
 export function useControlValue<T>(path: string, fallback: T): T {
   const opt = useStore((s) => s.optimistic[path])
   return opt !== undefined ? (opt.value as T) : fallback

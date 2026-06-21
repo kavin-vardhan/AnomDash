@@ -48,7 +48,7 @@ h3 { margin: 0 0 6px; font-size: 12px; color: var(--dim); font-weight: 600; }
 .connect-card .hint { color: var(--dim); font-size: 11px; margin: 2px 0 0; }
 
 /* --- app shell --- */
-.app { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+.app { display: grid; grid-template-rows: auto 1fr auto; height: 100%; }
 .session-bar { display: flex; align-items: center; gap: 12px; padding: 7px 12px; background: var(--panel); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .session-bar .conn { min-width: 80px; }
 .session-bar b { color: var(--text); }
@@ -132,8 +132,27 @@ h3 { margin: 0 0 6px; font-size: 12px; color: var(--dim); font-weight: 600; }
 .nf-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; padding: 2px 4px; }
 .nf-row .atarget { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* raw dump (A0) */
-.rawdump { position: fixed; right: 10px; bottom: 10px; width: 320px; background: rgba(15,17,21,0.95); border: 1px solid var(--border); border-radius: 6px; font-size: 11px; z-index: 10; }
-.rawdump-head { padding: 5px 8px; cursor: pointer; color: var(--dim); border-bottom: 1px solid var(--border); }
-.rawdump-body { padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; }
-.rawevents { margin-top: 6px; border-top: 1px solid var(--border); padding-top: 4px; color: var(--dim); max-height: 110px; overflow: auto; }
+/* capture panel */
+.capture .field { display: flex; flex-direction: column; gap: 3px; margin-bottom: 7px; color: var(--dim); }
+.capture .field input { color: var(--text); }
+.cap-row { display: flex; gap: 14px; align-items: center; margin-bottom: 8px; }
+.cap-row .seed-in { width: 60px; }
+.cap-controls { margin-bottom: 8px; }
+.cap-status { padding: 7px 8px; border-radius: 5px; }
+.cap-status.live { background: #2a1a1a; border: 1px solid #6b2c2c; }
+.cap-status.live .rec { color: var(--bad); font-weight: bold; }
+.cap-status.done { background: #16241a; border: 1px solid #2f6b3f; }
+
+/* event log (bottom, full width) */
+.eventlog { border-top: 1px solid var(--border); background: var(--panel); height: 150px; display: flex; flex-direction: column; }
+.el-head { display: flex; align-items: center; gap: 12px; padding: 5px 12px; border-bottom: 1px solid var(--border); }
+.el-title { color: var(--dim); font-weight: 600; }
+.el-filters { display: flex; gap: 5px; }
+.el-filters button { background: #1a212b; color: var(--dim); padding: 2px 9px; text-transform: capitalize; }
+.el-filters button.on { background: var(--accent); color: #fff; }
+.el-list { flex: 1; overflow: auto; padding: 4px 12px; }
+.el-row { display: grid; grid-template-columns: 84px 70px 1fr; gap: 8px; padding: 1px 0; }
+.el-t { color: #6b7280; }
+.el-k { text-transform: uppercase; font-size: 10px; align-self: center; }
+.el-k.inject { color: #63b3ed; } .el-k.auto { color: #f6ad55; } .el-k.capture { color: #68d391; } .el-k.system { color: #a0aec0; }
+.el-empty { padding: 6px 0; }

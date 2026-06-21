@@ -14,8 +14,8 @@ export function TargetsPanel() {
 
   return (
     <div className="panel targets">
-      <h3>Targets ({visible.length})</h3>
-      <input className="filter" placeholder="filter name / class…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+      <h3>Objects on screen ({visible.length})</h3>
+      <input className="filter" placeholder="filter by name / type…" value={filter} onChange={(e) => setFilter(e.target.value)} />
       <div className="list">
         {rows.map((v) => (
           <div

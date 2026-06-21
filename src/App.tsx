@@ -6,7 +6,8 @@ import { TargetsPanel } from './components/TargetsPanel'
 import { InjectPanel } from './components/InjectPanel'
 import { ActivePanel } from './components/ActivePanel'
 import { AutoPanel } from './components/AutoPanel'
-import { RawDump } from './components/RawDump'
+import { CapturePanel } from './components/CapturePanel'
+import { EventLog } from './components/EventLog'
 
 export default function App() {
   const everConnected = useStore((s) => s.everConnected)
@@ -29,10 +30,10 @@ export default function App() {
           <InjectPanel />
           <ActivePanel />
           <AutoPanel />
-          {/* Slice D: CapturePanel + EventLog */}
+          <CapturePanel />
         </div>
       </div>
-      <RawDump />
+      <EventLog />
     </div>
   )
 }

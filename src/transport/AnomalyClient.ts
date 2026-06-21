@@ -96,11 +96,10 @@ class AnomalyClient {
     const s = useStore.getState()
     switch (msg?.type) {
       case 'welcome':
-        s.setConn('connected')
+        s.setConn('connected') // derives the readable "connected"/"restored" event
         this.reconnectDelay = 500
         this.send({ type: 'subscribe', channels: ['snapshot', 'frames'], snapshotHz: this.snapshotHz, frameHz: this.frameHz })
         this.send({ type: 'list_anomalies' })
-        s.pushEvent('conn', `connected ${msg.server ?? ''}`.trim())
         break
       case 'snapshot':
         s.setSnapshot(msg as Snapshot)
@@ -108,17 +107,13 @@ class AnomalyClient {
       case 'catalog':
         s.setCatalog((msg.entries ?? []) as CatalogEntry[])
         break
-      case 'ack':
-        s.pushEvent('ack', `re=${msg.re}${msg.applied !== undefined ? ` applied=${msg.applied}` : ''}`)
-        break
       case 'capture_stopped':
-        s.pushEvent('capture', `stopped runDir=${msg.runDir} frames=${msg.frames}`)
+        s.setCaptureStopped({ runDir: msg.runDir ?? '', frames: Number(msg.frames ?? 0), seed: Number(msg.seed ?? 0), at: Date.now() })
         break
-      case 'capture_status':
-        s.pushEvent('capture', `status running=${msg.running} frames=${msg.frames}`)
-        break
+      // ack / capture_status / other replies carry no user-facing text; the readable activity log is
+      // derived from snapshot deltas (see store.deriveSnapshotEvents).
       default:
-        s.pushEvent('msg', String(msg?.type ?? 'unknown'))
+        break
     }
   }
 
