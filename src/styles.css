@@ -1,0 +1,87 @@
+:root {
+  --bg: #0c0e12;
+  --panel: #12151b;
+  --panel-2: #0f1115;
+  --border: #232833;
+  --text: #d7dbe0;
+  --dim: #8a909b;
+  --accent: #2b6cb0;
+  --ok: #48bb78;
+  --bad: #f56565;
+  --wait: #ecc94b;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-monospace, Consolas, "SF Mono", monospace;
+  font-size: 12px;
+}
+button {
+  background: var(--accent); color: #fff; border: 0; border-radius: 4px;
+  padding: 5px 10px; cursor: pointer; font-family: inherit; font-size: 12px;
+}
+button:disabled { background: #3a4049; cursor: not-allowed; }
+button.danger { background: #9b2c2c; }
+input { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 4px; padding: 4px 6px; font-family: inherit; }
+code { background: #1d2530; padding: 1px 4px; border-radius: 3px; }
+h3 { margin: 0 0 6px; font-size: 12px; color: var(--dim); font-weight: 600; }
+.dim { color: var(--dim); }
+.grow { flex: 1; }
+.sep { width: 1px; height: 18px; background: var(--border); }
+.inline { display: inline-flex; align-items: center; gap: 4px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.dot.ok { background: var(--ok); }
+.dot.bad { background: var(--bad); }
+
+/* --- connect screen --- */
+.connect-screen { height: 100%; display: grid; place-items: center; }
+.connect-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 22px 26px; width: 360px; display: flex; flex-direction: column; gap: 10px; }
+.connect-card h1 { margin: 0 0 6px; font-size: 18px; }
+.connect-card label { display: flex; flex-direction: column; gap: 4px; color: var(--dim); }
+.connect-card .status { padding: 4px 0; font-weight: bold; }
+.connect-card .status.ok { color: var(--ok); }
+.connect-card .status.bad { color: var(--bad); }
+.connect-card .status.wait { color: var(--wait); }
+.connect-card .hint { color: var(--dim); font-size: 11px; margin: 2px 0 0; }
+
+/* --- app shell --- */
+.app { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+.session-bar { display: flex; align-items: center; gap: 12px; padding: 7px 12px; background: var(--panel); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.session-bar .conn { min-width: 80px; }
+.session-bar b { color: var(--text); }
+.poll input[type=range] { width: 120px; }
+
+.main { display: grid; grid-template-columns: 270px 1fr 320px; gap: 8px; padding: 8px; min-height: 0; }
+.col { min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.col.center { align-items: stretch; }
+
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 8px; min-height: 0; display: flex; flex-direction: column; }
+.panel.placeholder { color: var(--dim); }
+
+/* targets */
+.targets { height: 100%; }
+.targets .filter { margin-bottom: 6px; }
+.targets .list { overflow: auto; min-height: 0; }
+.targets .row { display: flex; justify-content: space-between; gap: 8px; padding: 3px 5px; border-radius: 3px; cursor: pointer; }
+.targets .row:hover { background: #1a212b; }
+.targets .row.sel { background: var(--accent); color: #fff; }
+.targets .row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.targets .row .meta { color: var(--dim); white-space: nowrap; }
+.targets .row.sel .meta { color: #cfe0f5; }
+.targets .empty { color: var(--dim); padding: 8px 4px; }
+
+/* preview */
+.preview { display: flex; flex-direction: column; gap: 6px; height: 100%; }
+.preview-toolbar { display: flex; align-items: center; gap: 12px; }
+.canvas-wrap { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.frame-canvas, .overlay-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.overlay-canvas { cursor: crosshair; }
+
+/* raw dump (A0) */
+.rawdump { position: fixed; right: 10px; bottom: 10px; width: 320px; background: rgba(15,17,21,0.95); border: 1px solid var(--border); border-radius: 6px; font-size: 11px; z-index: 10; }
+.rawdump-head { padding: 5px 8px; cursor: pointer; color: var(--dim); border-bottom: 1px solid var(--border); }
+.rawdump-body { padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; }
+.rawevents { margin-top: 6px; border-top: 1px solid var(--border); padding-top: 4px; color: var(--dim); max-height: 110px; overflow: auto; }
