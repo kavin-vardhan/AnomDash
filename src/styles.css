@@ -80,6 +80,40 @@ h3 { margin: 0 0 6px; font-size: 12px; color: var(--dim); font-weight: 600; }
 .frame-canvas, .overlay-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .overlay-canvas { cursor: crosshair; }
 
+/* right column panels share vertical space */
+.col.right { overflow: auto; }
+.small { font-size: 11px; }
+.warn { color: var(--wait); }
+
+/* inject panel */
+.inject .field { display: flex; flex-direction: column; gap: 3px; margin-bottom: 7px; color: var(--dim); }
+.inject .field select, .inject .field input { color: var(--text); }
+.inject .usage { font-size: 11px; margin: -4px 0 8px; }
+.btn-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+
+/* arg controls */
+.argcontrols { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border); padding-top: 7px; margin-top: 4px; }
+.arg { display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: 6px; }
+.arg-label { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arg input[type=text], .arg input:not([type]), .arg input[type=number], .arg select { width: 100%; }
+.arg-row { display: flex; align-items: center; gap: 6px; }
+.arg-row input[type=range] { flex: 1; }
+.argval { min-width: 36px; text-align: right; color: var(--text); }
+
+/* active panel */
+.active .list { overflow: auto; min-height: 0; flex: 1; }
+.arow { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 5px; border-bottom: 1px solid #181d25; }
+.arow.pending { opacity: 0.65; font-style: italic; }
+.arow-main { display: flex; flex-direction: column; min-width: 0; }
+.arow-main .aid { color: var(--text); }
+.arow-main .atarget { color: var(--dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.arow-meta { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.arow-meta button { padding: 2px 7px; background: #2d3540; }
+.src { padding: 1px 5px; border-radius: 3px; font-size: 10px; text-transform: uppercase; }
+.src.manual { background: #2b4c6b; }
+.src.auto { background: #6b4a2b; }
+.active .empty { color: var(--dim); padding: 8px 4px; }
+
 /* raw dump (A0) */
 .rawdump { position: fixed; right: 10px; bottom: 10px; width: 320px; background: rgba(15,17,21,0.95); border: 1px solid var(--border); border-radius: 6px; font-size: 11px; z-index: 10; }
 .rawdump-head { padding: 5px 8px; cursor: pointer; color: var(--dim); border-bottom: 1px solid var(--border); }

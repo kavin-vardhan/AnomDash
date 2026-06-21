@@ -1,22 +1,31 @@
-import { useEffect, useState } from 'react'
-import { useStore } from '../store'
+import { useStore, useControlValue } from '../store'
 import { client } from '../transport/AnomalyClient'
 import { metres } from '../lib/format'
 
+// Optimistic toggle: flips instantly (store), sends the command; the snapshot reconciles.
+function OptToggle({ path, label, value, onSet }: { path: string; label: string; value: boolean; onSet: (v: boolean) => void }) {
+  const shown = useControlValue<boolean>(path, value)
+  return (
+    <label className="inline">
+      <input
+        type="checkbox"
+        checked={shown}
+        onChange={(e) => { useStore.getState().setOptimistic(path, e.target.checked); onSet(e.target.checked) }}
+      />
+      {label}
+    </label>
+  )
+}
+
 function PollRadiusSlider({ value }: { value: number }) {
-  const [local, setLocal] = useState(value)
-  const [dragging, setDragging] = useState(false)
-  // Re-sync from the server's value when not actively dragging (avoids fighting the 5 Hz echo).
-  useEffect(() => { if (!dragging) setLocal(value) }, [value, dragging])
+  const shown = useControlValue<number>('session.pollRadius', value)
   const MAX_CM = 20000 // 200 m
   return (
     <label className="inline poll" title="Poll radius (cull distance). Low end = OFF.">
-      poll <b>{metres(local)}</b>
+      poll <b>{metres(shown)}</b>
       <input
-        type="range" min={0} max={MAX_CM} step={100} value={local}
-        onMouseDown={() => setDragging(true)}
-        onMouseUp={() => setDragging(false)}
-        onChange={(e) => { const cm = Number(e.target.value); setLocal(cm); client.setPollRadius(cm) }}
+        type="range" min={0} max={MAX_CM} step={100} value={shown}
+        onChange={(e) => { const cm = Number(e.target.value); useStore.getState().setOptimistic('session.pollRadius', cm); client.setPollRadius(cm) }}
       />
     </label>
   )
@@ -38,18 +47,9 @@ export function SessionBar() {
       <span>active <b>{session ? session.activeCount : '—'}</b></span>
       <span className="sep" />
       <button className="danger" onClick={() => client.revertAll()} title="Revert every active anomaly">Revert all</button>
-      <label className="inline">
-        <input type="checkbox" checked={!!session?.viewportScoping} onChange={(e) => client.setViewportScoping(e.target.checked)} />
-        scoping
-      </label>
-      <label className="inline">
-        <input type="checkbox" checked={!!session?.selectorHud} onChange={(e) => client.setHud('selector', e.target.checked)} />
-        selector HUD
-      </label>
-      <label className="inline">
-        <input type="checkbox" checked={!!session?.autoHud} onChange={(e) => client.setHud('auto', e.target.checked)} />
-        auto HUD
-      </label>
+      <OptToggle path="session.viewportScoping" label="scoping" value={!!session?.viewportScoping} onSet={(v) => client.setViewportScoping(v)} />
+      <OptToggle path="session.selectorHud" label="selector HUD" value={!!session?.selectorHud} onSet={(v) => client.setHud('selector', v)} />
+      <OptToggle path="session.autoHud" label="auto HUD" value={!!session?.autoHud} onSet={(v) => client.setHud('auto', v)} />
       <span className="sep" />
       <PollRadiusSlider value={session?.pollRadius ?? 0} />
       <span className="grow" />

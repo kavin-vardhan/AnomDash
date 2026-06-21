@@ -3,6 +3,8 @@ import { ConnectScreen } from './components/ConnectScreen'
 import { SessionBar } from './components/SessionBar'
 import { PreviewCanvas } from './components/PreviewCanvas'
 import { TargetsPanel } from './components/TargetsPanel'
+import { InjectPanel } from './components/InjectPanel'
+import { ActivePanel } from './components/ActivePanel'
 import { RawDump } from './components/RawDump'
 
 export default function App() {
@@ -23,11 +25,9 @@ export default function App() {
           <PreviewCanvas />
         </div>
         <div className="col right">
-          {/* Slice B: InjectPanel + ActivePanel · Slice C: AutoPanel · Slice D: CapturePanel + EventLog */}
-          <div className="panel placeholder">
-            <h3>Controls</h3>
-            <p className="dim">Inject · Active · Auto · Capture — Slices B–D.</p>
-          </div>
+          <InjectPanel />
+          <ActivePanel />
+          {/* Slice C: AutoPanel · Slice D: CapturePanel + EventLog */}
         </div>
       </div>
       <RawDump />
