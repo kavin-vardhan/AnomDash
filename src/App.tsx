@@ -5,6 +5,7 @@ import { PreviewCanvas } from './components/PreviewCanvas'
 import { TargetsPanel } from './components/TargetsPanel'
 import { InjectPanel } from './components/InjectPanel'
 import { ActivePanel } from './components/ActivePanel'
+import { AutoPanel } from './components/AutoPanel'
 import { RawDump } from './components/RawDump'
 
 export default function App() {
@@ -27,7 +28,8 @@ export default function App() {
         <div className="col right">
           <InjectPanel />
           <ActivePanel />
-          {/* Slice C: AutoPanel · Slice D: CapturePanel + EventLog */}
+          <AutoPanel />
+          {/* Slice D: CapturePanel + EventLog */}
         </div>
       </div>
       <RawDump />

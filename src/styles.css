@@ -114,6 +114,24 @@ h3 { margin: 0 0 6px; font-size: 12px; color: var(--dim); font-weight: 600; }
 .src.auto { background: #6b4a2b; }
 .active .empty { color: var(--dim); padding: 8px 4px; }
 
+/* auto panel */
+.auto-run-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.auto-run-row .live { color: var(--ok); font-weight: bold; }
+.pool { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 7px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.pool-item { font-size: 11px; }
+.cadence { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 0; }
+.cad-pair { display: flex; align-items: center; gap: 4px; }
+.numfield { display: inline-flex; align-items: center; gap: 5px; color: var(--dim); }
+.numfield input { width: 56px; }
+.persist { color: var(--text); }
+.dev-row { display: flex; align-items: center; gap: 6px; padding-bottom: 6px; }
+.dev-row .step-in { width: 48px; }
+.dev-row button { background: #2d3540; }
+.nowfiring { border-top: 1px solid var(--border); padding-top: 6px; }
+.nf-head { margin-bottom: 3px; }
+.nf-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; padding: 2px 4px; }
+.nf-row .atarget { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* raw dump (A0) */
 .rawdump { position: fixed; right: 10px; bottom: 10px; width: 320px; background: rgba(15,17,21,0.95); border: 1px solid var(--border); border-radius: 6px; font-size: 11px; z-index: 10; }
 .rawdump-head { padding: 5px 8px; cursor: pointer; color: var(--dim); border-bottom: 1px solid var(--border); }
