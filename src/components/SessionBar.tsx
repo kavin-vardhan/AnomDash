@@ -1,6 +1,8 @@
+import { useEffect, useMemo, useRef } from 'react'
 import { useStore, useControlValue, useLive } from '../store'
 import { client } from '../transport/AnomalyClient'
-import { metres } from '../lib/format'
+import { metres, coveragePct } from '../lib/format'
+import { throttle } from '../lib/throttle'
 
 // Optimistic toggle: flips instantly (only if the command actually went out); the snapshot reconciles.
 function OptToggle({ path, label, value, onSet }: { path: string; label: string; value: boolean; onSet: (v: boolean) => boolean }) {
@@ -35,6 +37,41 @@ function PollRadiusSlider({ value }: { value: number }) {
   )
 }
 
+// Continuous control: the handle tracks the drag instantly (optimistic), WS sends are throttled (~10/sec) with an
+// authoritative send on release, and the numeric % readout is SNAPSHOT-bound (always the game's actual value, so it
+// also surfaces console-driven IAI.SetMinScreenCoverage changes — it trails the drag by one round-trip on purpose).
+function CoverageSlider({ value }: { value: number }) {
+  const shown = useControlValue<number>('session.minScreenCoverage', value) // slider position: optimistic-or-snapshot
+  const { live } = useLive()
+  const send = useMemo(() => throttle((pct: number) => client.setMinScreenCoverage(pct), 100), []) // created once
+  useEffect(() => () => send.cancel(), [send])
+  const lastPct = useRef(value)
+
+  const drag = (pct: number) => {
+    lastPct.current = pct
+    useStore.getState().setOptimistic('session.minScreenCoverage', pct) // handle tracks instantly; ignores lagging snapshot
+    send(pct)
+  }
+  const commit = () => {
+    send.cancel()
+    const pct = lastPct.current
+    if (client.setMinScreenCoverage(pct)) useStore.getState().setOptimistic('session.minScreenCoverage', pct) // authoritative final
+  }
+
+  return (
+    <label className="inline" title="Min on-screen coverage to be an anomaly target (percent of viewport). Zero = Off.">
+      coverage <b>{coveragePct(value)}</b>
+      <input
+        type="range" min={0} max={100} step={1} value={shown}
+        disabled={!live}
+        onChange={(e) => drag(Number(e.target.value))}
+        onPointerUp={commit}
+        onKeyUp={commit}
+      />
+    </label>
+  )
+}
+
 export function SessionBar() {
   const conn = useStore((s) => s.conn)
   const session = useStore((s) => s.snapshot?.session)
@@ -57,6 +94,7 @@ export function SessionBar() {
       <OptToggle path="session.autoHud" label="auto HUD" value={!!session?.autoHud} onSet={(v) => client.setHud('auto', v)} />
       <span className="sep" />
       <PollRadiusSlider value={session?.pollRadius ?? 0} />
+      <CoverageSlider value={session?.minScreenCoverage ?? 0} />
       <span className="grow" />
       <button onClick={() => client.disconnect()}>Disconnect</button>
     </div>

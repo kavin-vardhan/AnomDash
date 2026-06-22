@@ -15,3 +15,8 @@ export function fmtTime(ms: number): string {
 export function metres(cm: number): string {
   return cm <= 0 ? 'OFF' : `${(cm / 100).toFixed(0)} m`
 }
+
+// Screen-coverage cull readout: 0 (or less) = OFF -> "Off"; otherwise a whole-percent value.
+export function coveragePct(v: number): string {
+  return v <= 0 ? 'Off' : `${Math.round(v)}%`
+}

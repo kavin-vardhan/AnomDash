@@ -169,6 +169,7 @@ class AnomalyClient {
   setHud(which: 'selector' | 'auto', enabled: boolean) { return this.send({ type: 'set_hud', which, enabled }) }
   requestFrame() { return this.send({ type: 'request_frame' }) }
   setPollRadius(cm: number) { return this.send({ type: 'set_poll_radius', cm }) }
+  setMinScreenCoverage(pct: number) { return this.send({ type: 'set_min_screen_coverage', pct }) }
   autoConfig(cfg: Record<string, unknown>) { return this.send({ type: 'auto_config', ...cfg }) }
   autoRun(running: boolean) { return this.send({ type: 'auto_run', running }) }
   autoStep(seconds: number) { return this.send({ type: 'auto_step', seconds }) }

@@ -22,6 +22,10 @@ otherwise UTF-8 JSON. It never assumes a text opcode. See `src/transport/`.
   click-to-select), targets list, session bar (FPS/seed/revert-all/scoping/HUD toggles/poll-radius). Replaces
   `WebClient/spike-client.html` for monitoring.
 - B: inject + active panels. C: auto panel. D: capture panel + event log.
+- **Post-D:** screen-coverage slider on the session bar — the first *throttled* continuous control
+  (`src/lib/throttle.ts`: ~10/sec during a drag + an authoritative send on release; the handle tracks the drag
+  optimistically while the numeric % stays snapshot-bound/authoritative). The existing poll-radius slider still sends
+  on every change and **could adopt the same throttle util later** (intentionally not retrofitted this pass).
 
 ## Architecture
 - **State:** a single Zustand store (`src/store.ts`) holding the latest snapshot + latest frame + connection +

@@ -56,6 +56,7 @@ export interface SessionInfo {
   fps: number
   activeCount: number
   pollRadius: number // cm; 0 = OFF
+  minScreenCoverage: number // percent of viewport area; 0 = OFF
 }
 
 export interface CaptureInfo {
