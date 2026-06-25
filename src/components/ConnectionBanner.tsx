@@ -1,8 +1,6 @@
 import { useStore, useLive } from '../store'
 import { client } from '../transport/AnomalyClient'
 
-// Shown when the dashboard can't trust its state: not connected (reconnecting) or the snapshot stream has
-// stalled (engine state unknown). Controls are disabled in this state, so a click can't be silently lost.
 export function ConnectionBanner() {
   const { live, connected } = useLive()
   const conn = useStore((s) => s.conn)

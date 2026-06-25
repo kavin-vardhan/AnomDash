@@ -14,14 +14,11 @@ import { EventLog } from './components/EventLog'
 export default function App() {
   const everConnected = useStore((s) => s.everConnected)
 
-  // Timer-drive optimistic expiry + stall detection (independent of the snapshot stream).
   useEffect(() => {
     const id = setInterval(() => useStore.getState().tick(), 500)
     return () => clearInterval(id)
   }, [])
 
-  // Show the connect screen until the first successful connect; after that keep the dashboard mounted
-  // (the ConnectionBanner shows reconnect/stall state) so the canvas/state survive a brief drop.
   if (!everConnected) return <ConnectScreen />
 
   return (

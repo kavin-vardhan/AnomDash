@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import { useStore, useControlValue, useLive, HIDDEN_ANOMALY_IDS } from '../store'
 import { client } from '../transport/AnomalyClient'
 
-// Free-typed numeric field: local while editing, re-syncs from the snapshot when not focused, commits on
-// blur / Enter (so e.g. the seed field doesn't re-seed on every keystroke).
 function NumField({ label, value, step, min, disabled, onCommit }: { label: string; value: number; step?: number; min?: number; disabled?: boolean; onCommit: (n: number) => void }) {
   const [local, setLocal] = useState(String(value))
   const [editing, setEditing] = useState(false)
@@ -27,8 +25,6 @@ function NumField({ label, value, step, min, disabled, onCommit }: { label: stri
   )
 }
 
-// One pool checkbox (optimistic — flips instantly only if the command went out). NOT disabled during a
-// capture run: the pool is the user's injection SELECTION for capture (only Auto's free-run loop is suppressed).
 function PoolCheck({ id, fallback, enabled, onToggle }: { id: string; fallback: boolean; enabled: boolean; onToggle: (id: string, on: boolean) => void }) {
   const on = useControlValue<boolean>(`auto.pool.${id}`, fallback)
   return (
@@ -52,7 +48,6 @@ export function AutoPanel() {
   if (!auto) return <div className="panel auto"><h3>Auto-injection</h3><div className="dim">—</div></div>
 
   const poolIds = Object.keys(auto.pool).filter((id) => !HIDDEN_ANOMALY_IDS.has(id))
-  // Auto's free-run loop competes with capture's own driver -> block running it while capture owns injection.
   const runDisabled = !live || captureRunning
 
   const togglePool = (id: string, on: boolean) => {

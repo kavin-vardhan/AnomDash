@@ -16,7 +16,6 @@ export function PreviewCanvas() {
   const frameCanvas = useRef<HTMLCanvasElement>(null)
   const overlayCanvas = useRef<HTMLCanvasElement>(null)
 
-  // Draw the JPEG frame (stretched to the fixed canvas; overlay rects are normalized so this is consistent).
   useEffect(() => {
     const c = frameCanvas.current
     const ctx = c?.getContext('2d')
@@ -25,14 +24,12 @@ export function PreviewCanvas() {
     else { ctx.fillStyle = '#05070a'; ctx.fillRect(0, 0, c.width, c.height) }
   }, [frame])
 
-  // Draw the overlay (boxes / labels / active markers) from the snapshot.
   useEffect(() => {
     const c = overlayCanvas.current
     const ctx = c?.getContext('2d')
     if (!c || !ctx) return
     ctx.clearRect(0, 0, c.width, c.height)
     if (!snapshot) return
-    // Resolution change => epoch mismatch => skip overlay for this frame (best-effort alignment).
     if (frame && frame.epoch !== snapshot.epoch) return
 
     const activeTargets = new Set(snapshot.active.map((a) => a.target).filter(Boolean))

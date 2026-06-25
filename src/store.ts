@@ -4,11 +4,8 @@ import type { Snapshot, CatalogEntry, FrameData, ConnState, EventEntry } from '.
 const MAX_EVENTS = 300
 const OPT_TTL = 2500
 const ACTIVE_TTL = 3000
-const STALL_MS = 2000 // no snapshot for this long (while connected) => the stream is stalled / state unknown
+const STALL_MS = 2000
 
-// Anomalies hidden from the dashboard UI for now. They stay fully registered + applyable in-engine (the
-// server still emits them in the catalog/active/pool); the dashboard simply filters them out of its inject
-// dropdown and the auto pool. Empty this set to surface them again.
 export const HIDDEN_ANOMALY_IDS = new Set(['lod_corruption', 'lod_popping', 'time_dilation', 'lighting_mismatch'])
 
 function resolvePath(obj: unknown, path: string): unknown {
@@ -21,7 +18,6 @@ function appendEvent(events: EventEntry[], kind: string, text: string): EventEnt
   return base
 }
 
-// Plain-language activity from snapshot deltas — no raw acks / epoch / opcode noise.
 function deriveSnapshotEvents(prev: Snapshot | null, next: Snapshot): Array<{ kind: string; text: string }> {
   const out: Array<{ kind: string; text: string }> = []
   if (!prev) return out
@@ -71,8 +67,8 @@ interface AppState {
   catalog: CatalogEntry[]
   frame: FrameData | null
   lastCaptureStopped: CaptureStopped | null
-  lastSnapshotAt: number // ms timestamp of the last snapshot (0 = none yet)
-  stalled: boolean       // connected but no snapshot for STALL_MS => engine state unknown
+  lastSnapshotAt: number
+  stalled: boolean
 
   selectedActor: string | null
   overlay: { boxes: boolean; labels: boolean; active: boolean }
@@ -94,7 +90,7 @@ interface AppState {
   setOptimistic: (path: string, value: unknown, ttlMs?: number) => void
   addPendingInject: (id: string, target: string, source?: string) => void
   addPendingReverts: (ids: string[]) => void
-  tick: () => void // timer-driven: expire stale optimistic + recompute the stall flag (independent of snapshots)
+  tick: () => void
   hardReset: () => void
 }
 
@@ -171,8 +167,6 @@ export const useStore = create<AppState>((set, get) => ({
   tick: () =>
     set((st) => {
       const now = Date.now()
-      // Expire stale optimistic entries even when NO snapshot is arriving (a stalled stream otherwise never
-      // reconciles them) — the control then falls back to the last snapshot value, and the stall banner warns.
       let optimistic = st.optimistic
       let pruned = false
       const kept: Record<string, Optimistic> = {}
@@ -197,7 +191,6 @@ export const useStore = create<AppState>((set, get) => ({
   },
 }))
 
-// Connection liveness for the UI: controls are "live" only when connected AND the stream isn't stalled.
 export function useLive() {
   const conn = useStore((s) => s.conn)
   const stalled = useStore((s) => s.stalled)

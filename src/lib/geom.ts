@@ -1,6 +1,5 @@
 import type { VisibleActor } from '../types'
 
-// Rects covering ~the whole frame (foliage / room / spline) are de-emphasized and don't grab clicks.
 export const NEAR_FULLSCREEN_AREA = 0.8
 
 export function rectArea(r: number[]): number {
@@ -15,8 +14,6 @@ export function isNearFullscreen(r: number[]): boolean {
   return rectArea(r) >= NEAR_FULLSCREEN_AREA
 }
 
-// Click-to-select: among rectValid, not-near-fullscreen boxes containing the normalized point, the
-// SMALLEST-area box wins. Returns the actor name, or null.
 export function pickActorAt(visible: VisibleActor[], nx: number, ny: number): string | null {
   let best: VisibleActor | null = null
   let bestArea = Infinity

@@ -36,7 +36,6 @@ import subprocess
 import sys
 import time
 
-# --- defaults (override via CLI) ---
 CAPTURES_ROOT = r"D:\IntrusiveAnomalies\StackOBot\Saved\AnomalyCaptures"
 VERIFY_SCRIPT = r"D:\IntrusiveAnomalies\StackOBot\Plugins\AnomalyInjector\tools\verify_capture.py"
 POLL_SECONDS = 3.0
@@ -56,7 +55,7 @@ def overlay_run(run_dir, script):
             [sys.executable, script, "--dir", run_dir],
             capture_output=True, text=True, timeout=900,
         )
-    except Exception as e:  # launch failure (missing python/script, timeout, ...)
+    except Exception as e:
         log(f"FAILED to launch verify_capture.py for {name}: {e}")
         return False
 
@@ -86,11 +85,11 @@ def scan_once(root, script, failed):
         if not os.path.isdir(run_dir):
             continue
         if not os.path.isfile(os.path.join(run_dir, DONE_SIGNAL)):
-            continue  # not complete yet (or a single-shot 'manual' dir) - skip
+            continue
         if os.path.isfile(os.path.join(run_dir, MARKER)):
-            continue  # already overlaid (de-dup; survives restarts)
+            continue
         if run_dir in failed:
-            continue  # errored this session - retry on next restart (e.g. after installing Pillow)
+            continue
         if not os.path.isfile(os.path.join(run_dir, "labels.jsonl")):
             log(f"skip {name}: {DONE_SIGNAL} present but no labels.jsonl")
             failed.add(run_dir)

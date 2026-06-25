@@ -24,13 +24,12 @@ export function InjectPanel() {
   )
   const entryId = entry?.id
 
-  // Reset arg values to the schema defaults whenever the selected anomaly changes.
   useEffect(() => {
     if (!entry) return
     const init: Record<string, string> = {}
     for (const a of entry.args) init[a.name] = a.default
     setArgs(init)
-  }, [entryId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entryId])
 
   const grouped = useMemo(() => {
     const g: Record<string, CatalogEntry[]> = { object: [], component: [], global: [] }
@@ -53,10 +52,10 @@ export function InjectPanel() {
     else if (scope === 'component') { target = componentTarget.trim(); displayTarget = componentTarget.trim() }
 
     const argv = entry.args.map((a) => args[a.name] ?? a.default)
-    while (argv.length && argv[argv.length - 1].trim() === '') argv.pop() // trim trailing empty optionals
+    while (argv.length && argv[argv.length - 1].trim() === '') argv.pop()
 
     if (client.inject(entry.id, target, argv)) {
-      addPendingInject(entry.id, displayTarget, 'manual') // optimistic only if the command actually went out
+      addPendingInject(entry.id, displayTarget, 'manual')
     }
   }
 

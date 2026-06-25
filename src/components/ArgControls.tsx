@@ -1,8 +1,5 @@
 import type { ArgSpec } from '../types'
 
-// GENERIC schema renderer — NO per-anomaly hardcoding. A new anomaly renders correctly from its arg schema
-// with zero edits here. float+min&max -> slider; float open -> number; int+min&max -> slider; int open-max
-// (e.g. lod-index) -> number; enum -> dropdown; bool -> checkbox; string -> text; unknown -> text.
 export function ArgControls({
   specs,
   values,
@@ -50,7 +47,6 @@ function ArgControl({ spec, value, onChange }: { spec: ArgSpec; value: string; o
       </span>
     )
   } else {
-    // float open / int open-max (lod-index) / unknown -> number fallback
     control = (
       <input
         type="number"

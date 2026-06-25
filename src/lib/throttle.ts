@@ -1,11 +1,3 @@
-// Leading + trailing throttle: invokes at most once per `waitMs`, last-args-win for the trailing edge.
-// Used by continuous slider controls (e.g. the coverage slider) to cap the WS send rate during a drag
-// (per-pixel flooding is the competing-drivers / frozen-dashboard failure mode), with cancel() so the
-// caller can do an authoritative send on release.
-//
-// NOTE: the existing poll-radius slider still sends on every onChange; it could adopt this util later —
-// intentionally not retrofitted as of this change.
-
 export interface Throttled<A extends unknown[]> {
   (...args: A): void
   cancel: () => void
@@ -32,7 +24,7 @@ export function throttle<A extends unknown[]>(fn: (...args: A) => void, waitMs: 
       }
       run(args)
     } else {
-      pending = args // last value within the window wins
+      pending = args
       if (!timer) {
         timer = setTimeout(() => {
           timer = null

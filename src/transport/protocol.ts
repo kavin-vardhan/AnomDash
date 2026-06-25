@@ -1,9 +1,5 @@
-// Wire protocol helpers. The one rule: server->client messages are WS BINARY frames (incl. JSON), so we
-// classify by CONTENT — a leading "AIF1" magic is a preview frame, anything else is UTF-8 JSON.
-
 export const PROTOCOL_VERSION = 1
 
-// "AIF1"
 const MAGIC = [0x41, 0x49, 0x46, 0x31]
 
 export interface FrameHeader {
@@ -27,7 +23,6 @@ export function parseFrameHeader(bytes: Uint8Array): FrameHeader {
   }
 }
 
-// The JPEG payload follows the 16-byte header.
 export function frameJpegSlice(bytes: Uint8Array): Uint8Array {
   return bytes.subarray(16)
 }

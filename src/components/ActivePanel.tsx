@@ -14,8 +14,6 @@ export function ActivePanel() {
   const shown = active.filter((a) => !revertingIds.has(a.id))
   const pendingShown = pendingInjects.filter((p) => !activeIds.has(p.id))
 
-  // COUNTDOWN: active[] has no secondsRemaining; derive it from auto.liveFires by id where present
-  // (manual/global injects simply show no countdown). Pure client — no server change.
   const countdown = (id: string): number | undefined => liveFires.find((f) => f.id === id)?.secondsRemaining
 
   const revertOne = (id: string) => { if (client.revert(id)) addPendingReverts([id]) }

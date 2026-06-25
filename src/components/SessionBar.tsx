@@ -4,7 +4,6 @@ import { client } from '../transport/AnomalyClient'
 import { metres, coveragePct } from '../lib/format'
 import { throttle } from '../lib/throttle'
 
-// Optimistic toggle: flips instantly (only if the command actually went out); the snapshot reconciles.
 function OptToggle({ path, label, value, onSet }: { path: string; label: string; value: boolean; onSet: (v: boolean) => boolean }) {
   const shown = useControlValue<boolean>(path, value)
   const { live } = useLive()
@@ -24,7 +23,7 @@ function OptToggle({ path, label, value, onSet }: { path: string; label: string;
 function PollRadiusSlider({ value }: { value: number }) {
   const shown = useControlValue<number>('session.pollRadius', value)
   const { live } = useLive()
-  const MAX_CM = 20000 // 200 m
+  const MAX_CM = 20000
   return (
     <label className="inline poll" title="Poll radius (cull distance). Low end = OFF.">
       poll <b>{metres(shown)}</b>
@@ -37,25 +36,22 @@ function PollRadiusSlider({ value }: { value: number }) {
   )
 }
 
-// Continuous control: the handle tracks the drag instantly (optimistic), WS sends are throttled (~10/sec) with an
-// authoritative send on release, and the numeric % readout is SNAPSHOT-bound (always the game's actual value, so it
-// also surfaces console-driven IAI.SetMinScreenCoverage changes — it trails the drag by one round-trip on purpose).
 function CoverageSlider({ value }: { value: number }) {
-  const shown = useControlValue<number>('session.minScreenCoverage', value) // slider position: optimistic-or-snapshot
+  const shown = useControlValue<number>('session.minScreenCoverage', value)
   const { live } = useLive()
-  const send = useMemo(() => throttle((pct: number) => client.setMinScreenCoverage(pct), 100), []) // created once
+  const send = useMemo(() => throttle((pct: number) => client.setMinScreenCoverage(pct), 100), [])
   useEffect(() => () => send.cancel(), [send])
   const lastPct = useRef(value)
 
   const drag = (pct: number) => {
     lastPct.current = pct
-    useStore.getState().setOptimistic('session.minScreenCoverage', pct) // handle tracks instantly; ignores lagging snapshot
+    useStore.getState().setOptimistic('session.minScreenCoverage', pct)
     send(pct)
   }
   const commit = () => {
     send.cancel()
     const pct = lastPct.current
-    if (client.setMinScreenCoverage(pct)) useStore.getState().setOptimistic('session.minScreenCoverage', pct) // authoritative final
+    if (client.setMinScreenCoverage(pct)) useStore.getState().setOptimistic('session.minScreenCoverage', pct)
   }
 
   return (

@@ -2,9 +2,6 @@ import { useStore } from '../store'
 import type { Snapshot, CatalogEntry } from '../types'
 import { isFrameBytes, parseFrameHeader, frameJpegSlice, PROTOCOL_VERSION } from './protocol'
 
-// One WebSocket to the in-game control server. Framing-agnostic decode (binary => sniff "AIF1" magic, else
-// UTF-8 JSON), connect/auth/subscribe flow, exponential-backoff reconnect, and command helpers. The transport
-// writes to the Zustand store imperatively; React panels read from the store.
 class AnomalyClient {
   private ws: WebSocket | null = null
   private url = ''
@@ -12,10 +9,9 @@ class AnomalyClient {
   private reconnectDelay = 500
   private intentionalClose = false
 
-  // subscribe cadence (server clamps snapshot<=20, frame<=10)
   private snapshotHz = 5
   private frameHz = 6
-  private lastCaptureRunning = false // to drop preview frames while a capture run owns the viewport
+  private lastCaptureRunning = false
 
   connect(url: string, token: string) {
     this.url = url
@@ -27,18 +23,16 @@ class AnomalyClient {
 
   disconnect() {
     this.intentionalClose = true
-    try { this.ws?.close() } catch { /* ignore */ }
+    try { this.ws?.close() } catch {   }
     this.ws = null
     useStore.getState().hardReset()
   }
 
-  // Force a fresh connection — for a stalled-but-open socket (no close event) the auto-reconnect never fires,
-  // so the user can re-establish the stream manually.
   reconnect() {
     if (!this.url) return
     this.intentionalClose = false
     this.reconnectDelay = 500
-    try { this.ws?.close() } catch { /* ignore */ }
+    try { this.ws?.close() } catch {   }
     this.ws = null
     this.open()
   }
@@ -69,11 +63,10 @@ class AnomalyClient {
       this.send({ type: 'hello', token: this.token, v: PROTOCOL_VERSION })
     }
     ws.onmessage = (ev) => this.onMessage(ev)
-    ws.onerror = () => { /* onclose handles recovery */ }
+    ws.onerror = () => {   }
     ws.onclose = () => {
       this.ws = null
       if (this.intentionalClose) return
-      // Keep everConnected so the dashboard stays mounted with a reconnecting banner.
       useStore.getState().setConn('disconnected', 'connection closed')
       this.scheduleReconnect()
     }
@@ -88,19 +81,17 @@ class AnomalyClient {
   private onMessage(ev: MessageEvent) {
     let bytes: Uint8Array
     if (typeof ev.data === 'string') {
-      bytes = new TextEncoder().encode(ev.data) // defensive: a text opcode would still be JSON
+      bytes = new TextEncoder().encode(ev.data)
     } else {
       bytes = new Uint8Array(ev.data as ArrayBuffer)
     }
 
     if (isFrameBytes(bytes)) {
       const h = parseFrameHeader(bytes)
-      // Copy the JPEG slice into a fresh ArrayBuffer-backed Uint8Array (a subarray view types as
-      // Uint8Array<ArrayBufferLike>, which the DOM lib won't accept as a BlobPart).
       const blob = new Blob([new Uint8Array(frameJpegSlice(bytes))], { type: 'image/jpeg' })
       createImageBitmap(blob)
         .then((bitmap) => useStore.getState().setFrame({ bitmap, frameId: h.frameId, epoch: h.epoch, w: h.w, h: h.h }))
-        .catch(() => { /* drop a bad frame */ })
+        .catch(() => {   })
       return
     }
 
@@ -117,7 +108,7 @@ class AnomalyClient {
     const s = useStore.getState()
     switch (msg?.type) {
       case 'welcome':
-        s.setConn('connected') // derives the readable "connected"/"restored" event
+        s.setConn('connected')
         this.reconnectDelay = 500
         this.lastCaptureRunning = false
         this.subscribe(true)
@@ -125,9 +116,6 @@ class AnomalyClient {
         break
       case 'snapshot': {
         s.setSnapshot(msg as Snapshot)
-        // Load mitigation: while a capture run owns the viewport, drop the preview frames — their per-cycle
-        // ReadPixels is redundant (capture is writing frames to disk) and doubles the render-flush stall that
-        // starves the snapshot stream. Re-subscribe to frames when capture stops.
         const capRunning = !!(msg.capture && msg.capture.running)
         if (capRunning !== this.lastCaptureRunning) {
           this.lastCaptureRunning = capRunning
@@ -141,15 +129,11 @@ class AnomalyClient {
       case 'capture_stopped':
         s.setCaptureStopped({ runDir: msg.runDir ?? '', frames: Number(msg.frames ?? 0), seed: Number(msg.seed ?? 0), at: Date.now() })
         break
-      // ack / capture_status / other replies carry no user-facing text; the readable activity log is
-      // derived from snapshot deltas (see store.deriveSnapshotEvents).
       default:
         break
     }
   }
 
-  // Returns true if the command went out, false if dropped (socket not OPEN) — a dropped command logs a
-  // visible error and (per the call sites) does NOT set an optimistic "success", so the UI never lies.
   send(obj: unknown): boolean {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(obj))
@@ -160,7 +144,6 @@ class AnomalyClient {
     return false
   }
 
-  // --- command helpers (return whether the command was actually sent) ---
   listAnomalies() { return this.send({ type: 'list_anomalies' }) }
   inject(anomaly: string, target: string, args: string[]) { return this.send({ type: 'inject', anomaly, target, args }) }
   revert(anomaly: string) { return this.send({ type: 'revert', anomaly }) }

@@ -1,7 +1,5 @@
 @echo off
 setlocal
-rem Double-click launcher for overlay_watcher.py. Host tooling only; nothing else changes.
-rem Runs the watcher with the Pillow-equipped interpreter. %~dp0 = this .bat's folder (portable if it moves).
 
 set "PY=C:\Python313\python.exe"
 set "SCRIPT=%~dp0overlay_watcher.py"

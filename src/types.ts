@@ -1,5 +1,3 @@
-// Types for the LOCKED INPUTS from the in-game control server (server is feature-complete; do not change it).
-
 export interface ViewInfo {
   origin: number[]
   rot: number[]
@@ -12,9 +10,9 @@ export interface ViewInfo {
 export interface VisibleActor {
   name: string
   class: string
-  comp: string // "SM" | "SK" (VFX removed from the renderable set)
+  comp: string
   dist: number
-  rect: number[] // [x0,y0,x1,y1] normalized, top-left origin
+  rect: number[]
   rectValid: boolean
 }
 
@@ -22,10 +20,8 @@ export interface ActiveAnomaly {
   id: string
   target: string
   args: string[]
-  source: string // "manual" | "auto"
+  source: string
   tActive: number
-  // NOTE: the server's active[] does NOT currently emit secondsRemaining (only auto.liveFires does).
-  // Optional here; ActivePanel (Slice B) can cross-reference auto.liveFires by id.
   secondsRemaining?: number
 }
 
@@ -45,7 +41,7 @@ export interface AutoState {
   holdMax: number
   maxConcurrent: number
   persist: boolean
-  pool: Record<string, boolean> // the firing pool (object-scoped ids), authoritative
+  pool: Record<string, boolean>
   liveFires: LiveFire[]
 }
 
@@ -55,8 +51,8 @@ export interface SessionInfo {
   autoHud: boolean
   fps: number
   activeCount: number
-  pollRadius: number // cm; 0 = OFF
-  minScreenCoverage: number // percent of viewport area; 0 = OFF
+  pollRadius: number
+  minScreenCoverage: number
 }
 
 export interface CaptureInfo {
