@@ -90,7 +90,14 @@ def encode_session(session_dir, ffmpeg):
         return False
 
     video = ann.get("video", {}) if isinstance(ann, dict) else {}
-    fps = int(video.get("fps", 30) or 30)
+    # fps is the MEASURED session rate (may be fractional, e.g. 9.83); ffmpeg accepts fractional -framerate.
+    try:
+        fps = float(video.get("fps", 30) or 30)
+    except (TypeError, ValueError):
+        fps = 30.0
+    if fps <= 0:
+        fps = 30.0
+    fps = round(fps, 3)
     frames_rel = video.get("frames_dir", FRAMES_SUBDIR)
     video_rel = video.get("path", f"Video_Clip/{name}.mp4")
 
