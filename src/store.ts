@@ -54,7 +54,7 @@ function deriveSnapshotEvents(prev: Snapshot | null, next: Snapshot): Array<{ ki
 interface Optimistic { value: unknown; until: number }
 interface PendingInject { id: string; target: string; source: string; at: number }
 interface PendingRevert { id: string; at: number }
-interface CaptureStopped { runDir: string; frames: number; seed: number; at: number }
+interface CaptureStopped { runDir: string; sessionId: string; frames: number; maxFrames: number; seed: number; at: number }
 
 interface AppState {
   conn: ConnState

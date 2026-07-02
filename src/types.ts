@@ -58,7 +58,10 @@ export interface SessionInfo {
 export interface CaptureInfo {
   running: boolean
   framesWritten: number
+  maxFrames: number
+  framesRemaining: number
   runDir: string
+  sessionId: string
   seed: number
 }
 

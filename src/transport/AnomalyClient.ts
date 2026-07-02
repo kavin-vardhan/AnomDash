@@ -127,7 +127,7 @@ class AnomalyClient {
         s.setCatalog((msg.entries ?? []) as CatalogEntry[])
         break
       case 'capture_stopped':
-        s.setCaptureStopped({ runDir: msg.runDir ?? '', frames: Number(msg.frames ?? 0), seed: Number(msg.seed ?? 0), at: Date.now() })
+        s.setCaptureStopped({ runDir: msg.runDir ?? '', sessionId: msg.sessionId ?? '', frames: Number(msg.frames ?? 0), maxFrames: Number(msg.maxFrames ?? 0), seed: Number(msg.seed ?? 0), at: Date.now() })
         break
       default:
         break
