@@ -4,6 +4,15 @@ External control dashboard for the **AnomalyInjector** plugin's in-game control 
 client** — it connects to the in-game WebSocket server at `ws://127.0.0.1:8077` and never touches the network
 at runtime. (Host tooling, like the MCP bridge; its own repo, independent of the plugin.)
 
+## Source convention — no comments
+Source in this repo carries **no comments** — none, including any file-header / copyright banner — across
+TS/TSX, CSS, Python, and `.bat`. This is deliberate and repo-wide (mirrors the plugin repo). **Do not add
+comments, and strip any before committing** (feature/host-tools updates keep re-introducing them; this has
+been re-stripped twice now). Enforced with a deterministic, byte-preserving stripper kept alongside the repos
+at `../_strip_comments.py` — it preserves every non-comment byte, all string/regex/template literal contents,
+CRLF endings and the BOM: run `python ../_strip_comments.py .` from the repo root. Put rationale and design
+notes in commit messages, not in the code.
+
 ## Dev run
 1. `npm install`  *(the only network access — build-time only)*
 2. `npm run dev`  →  http://localhost:5173
