@@ -1,9 +1,5 @@
 @echo off
 setlocal
-rem Double-click launcher for encode_watcher.py. Host tooling only; nothing else changes.
-rem encode_watcher.py is stdlib-only (no Pillow), but we reuse the same interpreter for consistency.
-rem FFMPEG points at the prebuilt ffmpeg bin dir; edit it if yours lives elsewhere. The script itself does
-rem NOT hardcode ffmpeg - it falls back to PATH when --ffmpeg is omitted.
 
 set "PY=C:\Python313\python.exe"
 set "SCRIPT=%~dp0encode_watcher.py"

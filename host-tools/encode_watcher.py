@@ -45,7 +45,6 @@ import subprocess
 import sys
 import time
 
-# --- defaults (override via CLI) ---
 CAPTURES_ROOT = r"D:\IntrusiveAnomalies\StackOBot\Saved\AnomalyCaptures"
 POLL_SECONDS = 3.0
 MARKER = ".mp4_done"
@@ -66,8 +65,8 @@ def resolve_ffmpeg(arg):
         for cand in (os.path.join(arg, "ffmpeg.exe"), os.path.join(arg, "ffmpeg")):
             if os.path.isfile(cand):
                 return cand
-        return None  # explicit path given but nothing usable there
-    return shutil.which("ffmpeg")  # default: PATH
+        return None
+    return shutil.which("ffmpeg")
 
 
 def detect_frame_ext(frames_dir):
@@ -90,7 +89,6 @@ def encode_session(session_dir, ffmpeg):
         return False
 
     video = ann.get("video", {}) if isinstance(ann, dict) else {}
-    # fps is the MEASURED session rate (may be fractional, e.g. 9.83); ffmpeg accepts fractional -framerate.
     try:
         fps = float(video.get("fps", 30) or 30)
     except (TypeError, ValueError):
@@ -112,8 +110,6 @@ def encode_session(session_dir, ffmpeg):
 
     out_path = os.path.join(session_dir, os.path.normpath(video_rel))
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
-    # ffmpeg's image2 demuxer needs forward slashes in the %05d pattern, even on Windows (a backslash path
-    # makes it match zero frames -> "received no packets").
     input_pattern = os.path.join(frames_dir, f"frame_%05d.{ext}").replace("\\", "/")
 
     cmd = [
@@ -121,9 +117,6 @@ def encode_session(session_dir, ffmpeg):
         "-framerate", str(fps),
         "-start_number", "0",
         "-i", input_pattern,
-        # H.264 + yuv420p need even dimensions; PIE viewports can be odd (e.g. 1238x585). Pad up to even
-        # (adds <=1px at bottom/right) rather than scale/crop, so the top-left origin -- and thus every
-        # bbox_px coordinate in labels.jsonl / annotation.json -- stays valid on the encoded video.
         "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2",
         "-c:v", "libx264",
         "-pix_fmt", "yuv420p",
@@ -131,7 +124,7 @@ def encode_session(session_dir, ffmpeg):
     ]
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
-    except Exception as e:  # launch failure (bad ffmpeg path, timeout, ...)
+    except Exception as e:
         log(f"FAILED to launch ffmpeg for {name}: {e}")
         return False
 
@@ -159,13 +152,13 @@ def scan_once(root, ffmpeg, failed):
         if not os.path.isdir(session_dir):
             continue
         if not os.path.isfile(os.path.join(session_dir, DONE_SIGNAL)):
-            continue  # not complete yet
+            continue
         if not os.path.isfile(os.path.join(session_dir, ANNOTATION)):
-            continue  # not a session envelope (pre-m9 flat run / manual shot) - nothing to encode
+            continue
         if os.path.isfile(os.path.join(session_dir, MARKER)):
-            continue  # already encoded (de-dup; survives restarts)
+            continue
         if session_dir in failed:
-            continue  # errored this session - retry on next restart (e.g. after installing ffmpeg)
+            continue
         if ffmpeg is None:
             log(f"FLAG {name}: ffmpeg not found (pass --ffmpeg <path> or add it to PATH); frames + "
                 f"annotation.json are intact - re-run after installing to encode.")
