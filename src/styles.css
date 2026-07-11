@@ -86,19 +86,6 @@ h3 { margin: 0 0 6px; font-size: 12px; color: var(--dim); font-weight: 600; }
 .small { font-size: 11px; }
 .warn { color: var(--wait); }
 
-.inject .field { display: flex; flex-direction: column; gap: 3px; margin-bottom: 7px; color: var(--dim); }
-.inject .field select, .inject .field input { color: var(--text); }
-.inject .usage { font-size: 11px; margin: -4px 0 8px; }
-.btn-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-
-.argcontrols { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--border); padding-top: 7px; margin-top: 4px; }
-.arg { display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: 6px; }
-.arg-label { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.arg input[type=text], .arg input:not([type]), .arg input[type=number], .arg select { width: 100%; }
-.arg-row { display: flex; align-items: center; gap: 6px; }
-.arg-row input[type=range] { flex: 1; }
-.argval { min-width: 36px; text-align: right; color: var(--text); }
-
 .active .list { overflow: auto; min-height: 0; flex: 1; }
 .arow { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 5px; border-bottom: 1px solid #181d25; }
 .arow.pending { opacity: 0.65; font-style: italic; }
@@ -112,25 +99,21 @@ h3 { margin: 0 0 6px; font-size: 12px; color: var(--dim); font-weight: 600; }
 .src.auto { background: #6b4a2b; }
 .active .empty { color: var(--dim); padding: 8px 4px; }
 
-.auto-run-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.auto-run-row .live { color: var(--ok); font-weight: bold; }
 .pool { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 7px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .pool-item { font-size: 11px; }
-.cadence { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 0; }
-.cad-pair { display: flex; align-items: center; gap: 4px; }
-.numfield { display: inline-flex; align-items: center; gap: 5px; color: var(--dim); }
-.numfield input { width: 56px; }
-.persist { color: var(--text); }
-.dev-row { display: flex; align-items: center; gap: 6px; padding-bottom: 6px; }
-.dev-row .step-in { width: 48px; }
-.dev-row button { background: #2d3540; }
 .nowfiring { border-top: 1px solid var(--border); padding-top: 6px; }
 .nf-head { margin-bottom: 3px; }
 .nf-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; padding: 2px 4px; }
 .nf-row .atarget { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+.mode-toggle { display: flex; gap: 4px; margin-bottom: 8px; }
+.mode-toggle button { flex: 1; background: #1a212b; color: var(--dim); }
+.mode-toggle button.on { background: var(--accent); color: #fff; }
+.cap-mode-note { margin: -2px 0 8px; }
+.pool.inactive { opacity: 0.45; }
+
 .capture .field { display: flex; flex-direction: column; gap: 3px; margin-bottom: 7px; color: var(--dim); }
-.capture .field input { color: var(--text); }
+.capture .field select, .capture .field input { color: var(--text); }
 .cap-row { display: flex; gap: 14px; align-items: center; margin-bottom: 8px; }
 .cap-row .seed-in { width: 60px; }
 .cap-controls { margin-bottom: 8px; }

@@ -70,6 +70,7 @@ interface AppState {
   lastSnapshotAt: number
   stalled: boolean
 
+  captureMode: 'auto' | 'targeted'
   selectedActor: string | null
   overlay: { boxes: boolean; labels: boolean; active: boolean }
   events: EventEntry[]
@@ -84,6 +85,7 @@ interface AppState {
   setCatalog: (c: CatalogEntry[]) => void
   setFrame: (f: FrameData) => void
   setCaptureStopped: (d: CaptureStopped) => void
+  setCaptureMode: (m: 'auto' | 'targeted') => void
   selectActor: (name: string | null) => void
   toggleOverlay: (k: 'boxes' | 'labels' | 'active') => void
   pushEvent: (kind: string, text: string) => void
@@ -105,6 +107,7 @@ export const useStore = create<AppState>((set, get) => ({
   lastCaptureStopped: null,
   lastSnapshotAt: 0,
   stalled: false,
+  captureMode: 'auto',
   selectedActor: null,
   overlay: { boxes: true, labels: true, active: true },
   events: [],
@@ -149,6 +152,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
   setCaptureStopped: (d) =>
     set((st) => ({ lastCaptureStopped: d, events: appendEvent(st.events, 'capture', `run complete — ${d.frames} frames saved`) })),
+  setCaptureMode: (m) => set({ captureMode: m }),
   selectActor: (name) => set({ selectedActor: name }),
   toggleOverlay: (k) => set((st) => ({ overlay: { ...st.overlay, [k]: !st.overlay[k] } })),
   pushEvent: (kind, text) => set((st) => ({ events: appendEvent(st.events, kind, text) })),
@@ -185,7 +189,7 @@ export const useStore = create<AppState>((set, get) => ({
     if (prev?.bitmap) prev.bitmap.close()
     set({
       conn: 'disconnected', everConnected: false, snapshot: null, frame: null, catalog: [],
-      selectedActor: null, optimistic: {}, pendingInjects: [], pendingReverts: [],
+      captureMode: 'auto', selectedActor: null, optimistic: {}, pendingInjects: [], pendingReverts: [],
       lastSnapshotAt: 0, stalled: false,
     })
   },

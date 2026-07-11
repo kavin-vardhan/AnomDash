@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore, useControlValue, useLive } from '../store'
 import { client } from '../transport/AnomalyClient'
 import { basename } from '../lib/format'
@@ -8,22 +8,44 @@ export function CapturePanel() {
   const lastStopped = useStore((s) => s.lastCaptureStopped)
   const setOptimistic = useStore((s) => s.setOptimistic)
 
+  const mode = useStore((s) => s.captureMode)
+  const setMode = useStore((s) => s.setCaptureMode)
+  const catalog = useStore((s) => s.catalog)
+  const visible = useStore((s) => s.snapshot?.visible ?? [])
+  const selected = useStore((s) => s.selectedActor)
+  const selectActor = useStore((s) => s.selectActor)
+
   const [dir, setDir] = useState('')
   const [format, setFormat] = useState<'png' | 'jpeg'>('png')
   const [seed, setSeed] = useState('')
   const [frames, setFrames] = useState('120')
+  const [anomalyId, setAnomalyId] = useState('')
 
   const running = useControlValue<boolean>('capture.running', cap?.running ?? false)
   const { live } = useLive()
 
+  const objectAnomalies = useMemo(() => catalog.filter((e) => e.scope === 'object'), [catalog])
+
+  useEffect(() => {
+    if (!anomalyId && objectAnomalies.length) setAnomalyId(objectAnomalies[0].id)
+  }, [objectAnomalies, anomalyId])
+
   const framesNum = Number(frames)
   const framesValid = frames.trim() !== '' && Number.isFinite(framesNum) && framesNum > 0
+
+  const targeted = mode === 'targeted'
+  const targetReady = !!selected && !!anomalyId
+  const canStart = live && (!targeted || targetReady)
 
   const start = () => {
     const opts: Record<string, unknown> = { format }
     if (dir.trim()) opts.dir = dir.trim()
     if (seed.trim() && !Number.isNaN(Number(seed))) opts.seed = Number(seed)
     if (framesValid) opts.maxFrames = Math.floor(framesNum)
+    if (targeted && selected && anomalyId) {
+      opts.anomaly = anomalyId
+      opts.target = selected
+    }
     if (client.captureStart(opts)) setOptimistic('capture.running', true)
   }
   const stop = () => {
@@ -41,6 +63,32 @@ export function CapturePanel() {
 
       {!running && (
         <>
+          <div className="mode-toggle">
+            <button className={targeted ? '' : 'on'} onClick={() => setMode('auto')}>Auto-pool</button>
+            <button className={targeted ? 'on' : ''} onClick={() => setMode('targeted')}>Targeted</button>
+          </div>
+
+          {targeted ? (
+            <>
+              <label className="field">
+                anomaly
+                <select value={anomalyId} onChange={(e) => setAnomalyId(e.target.value)}>
+                  {objectAnomalies.length === 0 && <option value="">loading catalog…</option>}
+                  {objectAnomalies.map((e) => <option key={e.id} value={e.id}>{e.id}</option>)}
+                </select>
+              </label>
+              <label className="field">
+                target (on-screen)
+                <select value={selected ?? ''} onChange={(e) => selectActor(e.target.value || null)}>
+                  <option value="">— pick / click the preview —</option>
+                  {visible.map((v) => <option key={v.name} value={v.name}>{v.name}</option>)}
+                </select>
+              </label>
+            </>
+          ) : (
+            <div className="dim small cap-mode-note">fires a random mix from the pool below.</div>
+          )}
+
           <label className="field">
             output folder (optional)
             <input value={dir} placeholder="default: Saved/AnomalyCaptures" onChange={(e) => setDir(e.target.value)} />
@@ -65,9 +113,10 @@ export function CapturePanel() {
 
       <div className="cap-controls">
         {!running
-          ? <button disabled={!live} onClick={start}>Start capture</button>
+          ? <button disabled={!canStart} onClick={start}>Start capture</button>
           : <button className="danger" disabled={!live} onClick={stop}>Stop capture</button>}
       </div>
+      {!running && targeted && !targetReady && <div className="warn small">pick an object + anomaly</div>}
 
       {running && cap && (
         <div className="cap-status live">

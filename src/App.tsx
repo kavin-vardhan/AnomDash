@@ -5,7 +5,6 @@ import { ConnectionBanner } from './components/ConnectionBanner'
 import { SessionBar } from './components/SessionBar'
 import { PreviewCanvas } from './components/PreviewCanvas'
 import { TargetsPanel } from './components/TargetsPanel'
-import { InjectPanel } from './components/InjectPanel'
 import { ActivePanel } from './components/ActivePanel'
 import { AutoPanel } from './components/AutoPanel'
 import { CapturePanel } from './components/CapturePanel'
@@ -33,10 +32,9 @@ export default function App() {
           <PreviewCanvas />
         </div>
         <div className="col right">
-          <InjectPanel />
           <ActivePanel />
-          <AutoPanel />
           <CapturePanel />
+          <AutoPanel />
         </div>
       </div>
       <EventLog />
