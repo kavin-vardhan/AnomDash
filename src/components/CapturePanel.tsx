@@ -134,6 +134,14 @@ export function CapturePanel() {
           run complete: <b>{lastStopped.frames}</b> frames saved{reachedCap ? ' (reached cap)' : ''} → <span title={lastStopped.runDir}>{doneName}</span>
         </div>
       )}
+      {!running && lastStopped
+        && typeof lastStopped.targetFps === 'number'
+        && typeof lastStopped.stampedFps === 'number'
+        && Math.abs(lastStopped.stampedFps - lastStopped.targetFps) > 0.0005 && (
+        <div className="warn small">
+          couldn't hold {lastStopped.targetFps} fps — video stamped at {lastStopped.stampedFps} fps (true speed)
+        </div>
+      )}
     </div>
   )
 }
