@@ -56,7 +56,7 @@ function CoverageSlider({ value }: { value: number }) {
 
   return (
     <label className="inline" title="Min on-screen coverage to be an anomaly target (percent of viewport). Zero = Off.">
-      coverage <b>{coveragePct(value)}</b>
+      coverage <b>{coveragePct(shown)}</b>
       <input
         type="range" min={0} max={100} step={1} value={shown}
         disabled={!live}

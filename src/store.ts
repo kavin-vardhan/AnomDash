@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { Snapshot, CatalogEntry, FrameData, ConnState, EventEntry } from './types'
 
 const MAX_EVENTS = 300
-const OPT_TTL = 2500
+const PENDING_BACKSTOP_MS = 10000
 const ACTIVE_TTL = 3000
 const STALL_MS = 2000
 
@@ -10,6 +10,13 @@ export const HIDDEN_ANOMALY_IDS = new Set(['lod_corruption', 'lod_popping', 'tim
 
 function resolvePath(obj: unknown, path: string): unknown {
   return path.split('.').reduce<unknown>((o, k) => (o == null ? undefined : (o as Record<string, unknown>)[k]), obj)
+}
+
+export function keepOptimistic(e: Optimistic, cur: unknown, prev: unknown, now: number): boolean {
+  if (now > e.until) return false
+  if (cur === e.value) return false
+  if (cur !== e.baseline && cur === prev) return false
+  return true
 }
 
 function appendEvent(events: EventEntry[], kind: string, text: string): EventEntry[] {
@@ -51,7 +58,7 @@ function deriveSnapshotEvents(prev: Snapshot | null, next: Snapshot): Array<{ ki
   return out
 }
 
-interface Optimistic { value: unknown; until: number }
+interface Optimistic { value: unknown; baseline: unknown; until: number }
 interface PendingInject { id: string; target: string; source: string; at: number }
 interface PendingRevert { id: string; at: number }
 interface CaptureStopped {
@@ -92,7 +99,7 @@ interface AppState {
   selectActor: (name: string | null) => void
   toggleOverlay: (k: 'boxes' | 'labels' | 'active') => void
   pushEvent: (kind: string, text: string) => void
-  setOptimistic: (path: string, value: unknown, ttlMs?: number) => void
+  setOptimistic: (path: string, value: unknown) => void
   addPendingInject: (id: string, target: string, source?: string) => void
   addPendingReverts: (ids: string[]) => void
   tick: () => void
@@ -126,16 +133,18 @@ export const useStore = create<AppState>((set, get) => ({
       } else if (c === 'disconnected' && st.everConnected && st.conn !== 'disconnected') {
         events = appendEvent(events, 'system', 'connection lost — reconnecting…')
       }
-      return { conn: c, lastError: err, everConnected: st.everConnected || c === 'connected', events }
+      const cleared = c === 'disconnected' ? { optimistic: {}, pendingInjects: [], pendingReverts: [] } : {}
+      return { conn: c, lastError: err, everConnected: st.everConnected || c === 'connected', events, ...cleared }
     }),
   setCreds: (wsUrl, token) => set({ wsUrl, token }),
 
   setSnapshot: (s) =>
     set((st) => {
       const now = Date.now()
+      const prevSnap = st.snapshot
       const optimistic: Record<string, Optimistic> = {}
       for (const [path, e] of Object.entries(st.optimistic)) {
-        if (now <= e.until && resolvePath(s, path) !== e.value) optimistic[path] = e
+        if (keepOptimistic(e, resolvePath(s, path), resolvePath(prevSnap, path), now)) optimistic[path] = e
       }
       const activeIds = new Set(s.active.map((a) => a.id))
       const pendingInjects = st.pendingInjects.filter((p) => !activeIds.has(p.id) && now - p.at < ACTIVE_TTL)
@@ -160,8 +169,13 @@ export const useStore = create<AppState>((set, get) => ({
   toggleOverlay: (k) => set((st) => ({ overlay: { ...st.overlay, [k]: !st.overlay[k] } })),
   pushEvent: (kind, text) => set((st) => ({ events: appendEvent(st.events, kind, text) })),
 
-  setOptimistic: (path, value, ttlMs = OPT_TTL) =>
-    set((st) => ({ optimistic: { ...st.optimistic, [path]: { value, until: Date.now() + ttlMs } } })),
+  setOptimistic: (path, value) =>
+    set((st) => ({
+      optimistic: {
+        ...st.optimistic,
+        [path]: { value, baseline: resolvePath(st.snapshot, path), until: Date.now() + PENDING_BACKSTOP_MS },
+      },
+    })),
   addPendingInject: (id, target, source = 'manual') =>
     set((st) => ({ pendingInjects: [...st.pendingInjects.filter((p) => p.id !== id), { id, target, source, at: Date.now() }] })),
   addPendingReverts: (ids) =>

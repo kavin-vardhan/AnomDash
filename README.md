@@ -32,13 +32,21 @@ otherwise UTF-8 JSON. It never assumes a text opcode. See `src/transport/`.
   `WebClient/spike-client.html` for monitoring.
 - B: inject + active panels. C: auto panel. D: capture panel + event log.
 - **Post-D:** screen-coverage slider on the session bar — the first *throttled* continuous control
-  (`src/lib/throttle.ts`: ~10/sec during a drag + an authoritative send on release; the handle tracks the drag
-  optimistically while the numeric % stays snapshot-bound/authoritative). The existing poll-radius slider still sends
+  (`src/lib/throttle.ts`: ~10/sec during a drag + an authoritative send on release; both the handle and the
+  numeric % track the drag optimistically as of m13). The existing poll-radius slider still sends
   on every change and **could adopt the same throttle util later** (intentionally not retrofitted this pass).
+- **m13 (confirmation-bounded optimism):** control optimism is held until a snapshot CONFIRMS the value
+  (or the server settles it, e.g. a clamp), not a fixed wall-clock timer — so sliders/toggles no longer
+  snap back to the old value when the snapshot round-trip is slow. See `docs/sessions/2026-07-13-019-*`.
+
+## Design notes
+Milestone design notes / journals live in `docs/sessions/NNN-*.md` (numbered to stay aligned with the
+plugin repo's journal sequence). The no-comments source invariant means rationale goes there and in commit
+messages, never in code.
 
 ## Architecture
 - **State:** a single Zustand store (`src/store.ts`) holding the latest snapshot + latest frame + connection +
-  UI selection. Selector subscriptions keep per-panel re-renders cheap under the ~20 Hz snapshot / ~10 Hz frame push.
+  UI selection. Selector subscriptions keep per-panel re-renders cheap under the ~5 Hz snapshot / ~6 Hz frame push.
 - **Transport:** `src/transport/AnomalyClient.ts` (one WS, framing-agnostic decode, exponential-backoff reconnect,
   command helpers) + `protocol.ts` (AIF1 frame header).
 - **Pure client:** never modifies the plugin/server. Server gaps are flagged, not patched.
