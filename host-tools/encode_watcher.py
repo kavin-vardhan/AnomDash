@@ -45,7 +45,7 @@ import subprocess
 import sys
 import time
 
-CAPTURES_ROOT = r"D:\IntrusiveAnomalies\StackOBot\Saved\AnomalyCaptures"
+CAPTURES_ROOT = r"E:\AnomalyCaptures"
 POLL_SECONDS = 3.0
 MARKER = ".mp4_done"
 DONE_SIGNAL = "run_summary.json"
