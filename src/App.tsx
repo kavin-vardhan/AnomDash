@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
 import { useStore } from './store'
+import { client } from './transport/AnomalyClient'
+import { BAKED_TOKEN } from './config'
 import { ConnectScreen } from './components/ConnectScreen'
 import { ConnectionBanner } from './components/ConnectionBanner'
 import { SessionBar } from './components/SessionBar'
@@ -16,6 +18,14 @@ export default function App() {
   useEffect(() => {
     const id = setInterval(() => useStore.getState().tick(), 500)
     return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    if (!BAKED_TOKEN) return
+    const s = useStore.getState()
+    if (s.conn !== 'disconnected') return
+    s.setCreds(s.wsUrl, BAKED_TOKEN)
+    client.connect(s.wsUrl, BAKED_TOKEN)
   }, [])
 
   if (!everConnected) return <ConnectScreen />

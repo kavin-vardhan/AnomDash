@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { useStore } from '../store'
 import { client } from '../transport/AnomalyClient'
+import { BAKED_TOKEN } from '../config'
 
 export function ConnectScreen() {
   const conn = useStore((s) => s.conn)
   const wsUrl0 = useStore((s) => s.wsUrl)
+  const token0 = useStore((s) => s.token)
   const lastError = useStore((s) => s.lastError)
   const [url, setUrl] = useState(wsUrl0)
-  const [token, setToken] = useState('')
+  const [token, setToken] = useState(BAKED_TOKEN || token0)
   const busy = conn === 'connecting' || conn === 'authenticating'
 
   const connect = () => {
@@ -28,7 +30,7 @@ export function ConnectScreen() {
           <input
             value={token}
             onChange={(e) => setToken(e.target.value)}
-            placeholder="paste from the Output Log"
+            placeholder="auto-filled in a client build; else paste from the Output Log"
             spellCheck={false}
             onKeyDown={(e) => { if (e.key === 'Enter' && token.trim() && !busy) connect() }}
           />
@@ -40,7 +42,8 @@ export function ConnectScreen() {
           {conn}{lastError ? ` — ${lastError}` : ''}
         </div>
         <p className="hint">
-          In-game (PIE): run <code>IAI.Server.Start</code> and copy the token from the Output Log.
+          Client build: the token is baked in (<code>VITE_CONTROL_TOKEN</code>) and connects automatically.
+          In-editor (PIE): run <code>IAI.Server.Start</code> and copy the token from the Output Log.
         </p>
       </div>
     </div>

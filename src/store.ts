@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { Snapshot, CatalogEntry, FrameData, ConnState, EventEntry } from './types'
+import { DEFAULT_WS_URL, TOKEN_STORAGE_KEY, WSURL_STORAGE_KEY, loadStored, storeValue } from './config'
 
 const MAX_EVENTS = 300
 const PENDING_BACKSTOP_MS = 10000
@@ -109,8 +110,8 @@ interface AppState {
 export const useStore = create<AppState>((set, get) => ({
   conn: 'disconnected',
   everConnected: false,
-  wsUrl: 'ws://127.0.0.1:8077',
-  token: '',
+  wsUrl: loadStored(WSURL_STORAGE_KEY, DEFAULT_WS_URL),
+  token: loadStored(TOKEN_STORAGE_KEY, ''),
   snapshot: null,
   catalog: [],
   frame: null,
@@ -136,7 +137,11 @@ export const useStore = create<AppState>((set, get) => ({
       const cleared = c === 'disconnected' ? { optimistic: {}, pendingInjects: [], pendingReverts: [] } : {}
       return { conn: c, lastError: err, everConnected: st.everConnected || c === 'connected', events, ...cleared }
     }),
-  setCreds: (wsUrl, token) => set({ wsUrl, token }),
+  setCreds: (wsUrl, token) => {
+    storeValue(WSURL_STORAGE_KEY, wsUrl)
+    storeValue(TOKEN_STORAGE_KEY, token)
+    set({ wsUrl, token })
+  },
 
   setSnapshot: (s) =>
     set((st) => {

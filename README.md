@@ -13,11 +13,20 @@ at `../_strip_comments.py` — it preserves every non-comment byte, all string/r
 CRLF endings and the BOM: run `python ../_strip_comments.py .` from the repo root. Put rationale and design
 notes in commit messages, not in the code.
 
-## Dev run
+## Dev run (owner)
 1. `npm install`  *(the only network access — build-time only)*
 2. `npm run dev`  →  http://localhost:5173
 3. In-game (PIE): console `IAI.Server.Start` → copy the token from the Output Log
 4. Open http://localhost:5173, paste `ws://127.0.0.1:8077` + token, **Connect**
+
+The last token/URL you type is remembered (localStorage), so you don't re-paste every reload.
+
+## Client build (auto-connect, m16)
+For a client running a packaged game, bake a fixed token so the dashboard connects with zero copy-paste:
+copy `.env.example` → `.env`, set `VITE_CONTROL_TOKEN` to the **same** value as the game's
+`DefaultGame.ini [AnomalyControlServer] Token`, then `npm run build`. When `VITE_CONTROL_TOKEN` is present
+the dashboard pre-fills the token and auto-connects to `ws://127.0.0.1:8077` on load. `.env` is gitignored —
+never commit a real token. See the plugin's `docs/client-delivery.md` for the security tradeoff.
 
 `ws://` is not subject to CORS/same-origin, so the `:5173` dev server connecting to `:8077` works directly.
 
