@@ -114,8 +114,9 @@ h3 { margin: 0 0 6px; font-size: 12px; color: var(--dim); font-weight: 600; }
 
 .capture .field { display: flex; flex-direction: column; gap: 3px; margin-bottom: 7px; color: var(--dim); }
 .capture .field select, .capture .field input { color: var(--text); }
-.cap-row { display: flex; gap: 14px; align-items: center; margin-bottom: 8px; }
+.cap-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-bottom: 8px; }
 .cap-row .seed-in { width: 60px; }
+.capture .inline input, .capture .inline select { box-sizing: border-box; min-width: 0; }
 .cap-controls { margin-bottom: 8px; }
 .cap-status { padding: 7px 8px; border-radius: 5px; }
 .cap-status.live { background: #2a1a1a; border: 1px solid #6b2c2c; }
