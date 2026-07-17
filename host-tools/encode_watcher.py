@@ -9,7 +9,7 @@ path/fps come from the session's annotation.json). This is the mp4 half of the m
 so the plugin stays ships-as-a-build (no ffmpeg dependency in the engine).
 
 How it works:
-  - Polls CAPTURES_ROOT every few seconds (stdlib only; sessions complete at low frequency).
+  - Polls the captures root (--root) every few seconds (stdlib only; sessions complete at low frequency).
   - A session dir is "complete" when it contains BOTH run_summary.json AND annotation.json (the finalize
     artifacts) plus an Actual_Frames/ dir with frames. (annotation.json is a Stage-2 session; a pre-m9
     flat run without it is skipped - nothing to encode from a session envelope.)
@@ -27,10 +27,10 @@ ffmpeg discovery (do NOT hardcode a path):
                    annotation.json are intact; just re-run after installing ffmpeg / passing --ffmpeg).
 
 Run it (start once, leave running):
-  python D:\\IntrusiveAnomalies\\host-tools\\encode_watcher.py --ffmpeg "E:\\Downloads\\ffmpeg-8.1.2-full_build\\ffmpeg-8.1.2-full_build\\bin"
+  python encode_watcher.py --root "C:\\path\\to\\GameBuild\\Saved\\AnomalyCaptures" --ffmpeg "C:\\path\\to\\ffmpeg\\bin"
 
 Options:
-  --root <dir>      captures root (default below)
+  --root <dir>      captures root (REQUIRED - no default; error-and-exit if missing)
   --ffmpeg <path>   ffmpeg.exe or its bin dir (default: PATH lookup)
   --interval <sec>  poll interval (default 3)
   --once            process existing sessions and exit (no watch loop)
@@ -45,7 +45,6 @@ import subprocess
 import sys
 import time
 
-CAPTURES_ROOT = r"E:\AnomalyCaptures"
 POLL_SECONDS = 3.0
 MARKER = ".mp4_done"
 DONE_SIGNAL = "run_summary.json"
@@ -170,7 +169,7 @@ def scan_once(root, ffmpeg, failed):
 
 def main():
     ap = argparse.ArgumentParser(description="Auto-encode AnomalyInjector session captures to mp4 (host-side; engine untouched).")
-    ap.add_argument("--root", default=CAPTURES_ROOT, help="captures root containing session_<ts>_s<seed>/ dirs")
+    ap.add_argument("--root", required=True, help="captures root containing session_<ts>_s<seed>/ dirs (REQUIRED - no default)")
     ap.add_argument("--ffmpeg", default="", help="ffmpeg.exe or its bin dir (default: PATH lookup)")
     ap.add_argument("--interval", type=float, default=POLL_SECONDS, help="poll interval seconds")
     ap.add_argument("--once", action="store_true", help="process existing sessions and exit (no watch loop)")
