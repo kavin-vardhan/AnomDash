@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useStore, useControlValue, useLive } from '../store'
 import { client } from '../transport/AnomalyClient'
 import { basename } from '../lib/format'
+import { BAKED_CAPTURES_ROOT } from '../config'
 
 export function CapturePanel() {
   const cap = useStore((s) => s.snapshot?.capture)
@@ -15,7 +16,7 @@ export function CapturePanel() {
   const selected = useStore((s) => s.selectedActor)
   const selectActor = useStore((s) => s.selectActor)
 
-  const [dir, setDir] = useState('')
+  const [dir, setDir] = useState(BAKED_CAPTURES_ROOT)
   const [format, setFormat] = useState<'png' | 'jpeg'>('png')
   const [seed, setSeed] = useState('')
   const [frames, setFrames] = useState('120')
@@ -90,7 +91,7 @@ export function CapturePanel() {
           )}
 
           <label className="field">
-            output folder (optional)
+            captures folder{BAKED_CAPTURES_ROOT ? ' — the encoder watches here (set in Setup)' : ' (optional)'}
             <input value={dir} placeholder="default: Saved/AnomalyCaptures" onChange={(e) => setDir(e.target.value)} />
           </label>
           <div className="cap-row">

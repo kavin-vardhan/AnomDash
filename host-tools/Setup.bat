@@ -104,7 +104,7 @@ echo [3/4] Captures directory...
 
 :ask_captures
 set "CAPTURES_ROOT="
-set /p "CAPTURES_ROOT=Enter the folder the game writes captures to (its Saved\AnomalyCaptures): "
+set /p "CAPTURES_ROOT=Enter the folder where captures should be saved (any folder; created if missing): "
 if not defined CAPTURES_ROOT (
     echo       Please enter a path.
     goto ask_captures
@@ -135,10 +135,12 @@ popd
 if not "!NPMERR!"=="0" echo       WARNING: npm install reported an error (exit !NPMERR!). You can re-run Setup.bat.
 
 echo.
-echo Writing config.bat...
+echo Writing config...
 > "%CONFIG%" echo set "FFMPEG=!FFMPEG!"
 >> "%CONFIG%" echo set "CAPTURES_ROOT=!CAPTURES_ROOT!"
 >> "%CONFIG%" echo set "PY=!PY!"
+set "CR_FWD=!CAPTURES_ROOT:\=/!"
+> "%DASHBOARD%\.env.local" echo VITE_CAPTURES_ROOT=!CR_FWD!
 
 echo.
 echo ============================================================
