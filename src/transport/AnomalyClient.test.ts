@@ -205,6 +205,49 @@ describe('reconnect races', () => {
   })
 })
 
+describe('malformed message guard', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
+  function minimalSnapshot() {
+    return {
+      v: 1, type: 'snapshot', t: 0, epoch: 1,
+      view: {}, visible: [], active: [],
+      auto: { pool: {}, liveFires: [] },
+      session: {}, capture: {},
+    }
+  }
+
+  it('drops a malformed snapshot and logs exactly once', () => {
+    const c = new AnomalyClient()
+    const ws = openAndWelcome(c)
+    const before = useStore.getState().events.length
+    ws.serverJson({ type: 'snapshot' })
+    expect(useStore.getState().snapshot).toBeNull()
+    expect(useStore.getState().events).toHaveLength(before + 1)
+    ws.serverJson({ type: 'snapshot', active: 'nope' })
+    expect(useStore.getState().snapshot).toBeNull()
+    expect(useStore.getState().events).toHaveLength(before + 1)
+  })
+
+  it('a well-formed snapshot still lands', () => {
+    const c = new AnomalyClient()
+    const ws = openAndWelcome(c)
+    ws.serverJson(minimalSnapshot())
+    expect(useStore.getState().snapshot?.type).toBe('snapshot')
+  })
+
+  it('drops a catalog whose entries is not an array, accepts a valid one', () => {
+    const c = new AnomalyClient()
+    const ws = openAndWelcome(c)
+    ws.serverJson({ type: 'catalog', entries: 'nope' })
+    expect(useStore.getState().catalog).toHaveLength(0)
+    ws.serverJson({ type: 'catalog', entries: [{ id: 'blinking', description: '', usage: '', scope: 'object', args: [] }] })
+    expect(useStore.getState().catalog).toHaveLength(1)
+  })
+})
+
 describe('preview frame ordering', () => {
   it('a slow decode of an older frame cannot overwrite a newer one', async () => {
     const c = new AnomalyClient()

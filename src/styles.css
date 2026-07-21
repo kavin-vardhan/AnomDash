@@ -42,6 +42,10 @@ h3 { margin: 0 0 6px; font-size: 12px; color: var(--dim); font-weight: 600; }
 .dot.ok { background: var(--ok); }
 .dot.bad { background: var(--bad); }
 
+.error-screen { height: 100%; display: grid; place-items: center; }
+.error-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 22px 26px; max-width: 520px; display: flex; flex-direction: column; gap: 10px; }
+.error-card h1 { margin: 0; font-size: 16px; }
+
 .connect-screen { height: 100%; display: grid; place-items: center; }
 .connect-card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 22px 26px; width: 360px; display: flex; flex-direction: column; gap: 10px; }
 .connect-card h1 { margin: 0 0 6px; font-size: 18px; }

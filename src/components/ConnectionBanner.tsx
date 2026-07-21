@@ -10,7 +10,7 @@ export function ConnectionBanner() {
     ? 'Token rejected by server — if the game restarted with a new token, Disconnect and re-enter it; otherwise Reconnect now to retry.'
     : !connected
       ? `Not connected (${conn}) — controls disabled.`
-      : 'Stream stalled — engine state unknown. Displayed state may be out of date; controls disabled.'
+      : 'Stream stalled — engine state unknown. Displayed state may be out of date; most controls disabled (Stop capture / Revert all stay available).'
 
   return (
     <div className={`conn-banner ${connected ? 'stalled' : 'down'}`}>

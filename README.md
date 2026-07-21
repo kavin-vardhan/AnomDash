@@ -47,6 +47,14 @@ otherwise UTF-8 JSON. It never assumes a text opcode. See `src/transport/`.
 - **m13 (confirmation-bounded optimism):** control optimism is held until a snapshot CONFIRMS the value
   (or the server settles it, e.g. a clamp), not a fixed wall-clock timer — so sliders/toggles no longer
   snap back to the old value when the snapshot round-trip is slow. See `docs/sessions/2026-07-13-019-*`.
+- **M1 (robustness, 2026-07-21):** a wrong/missing token now lands in a distinct **auth-failed** state
+  (the server sends `{type:"error",code:"bad_token"}` as of plugin `3a46c1f`; the client also has a 4s
+  welcome-timeout fallback; no auto-retry) instead of hanging in "authenticating" forever. Reconnect
+  backoff timer tracked + all socket handlers identity-guarded (no stale-socket clobber). Preview-frame
+  decodes commit in order. **Stop capture / Revert all stay enabled while the stream is stalled** (only a
+  true disconnect disables them). Poll-radius slider throttled (shared `ThrottledSlider`). Structural
+  snapshot/catalog guard + top-level error boundary. One capture-stop event per run, stable event keys.
+  Dead inject-era code removed. See `docs/sessions/2026-07-21-020-dashboard-robustness.md`.
 
 ## Design notes
 Milestone design notes / journals live in `docs/sessions/NNN-*.md` (numbered to stay aligned with the
@@ -59,3 +67,5 @@ messages, never in code.
 - **Transport:** `src/transport/AnomalyClient.ts` (one WS, framing-agnostic decode, exponential-backoff reconnect,
   command helpers) + `protocol.ts` (AIF1 frame header).
 - **Pure client:** never modifies the plugin/server. Server gaps are flagged, not patched.
+- **Tests:** `npm test` (vitest, node env, no engine needed) — store suites (optimism, pending reverts,
+  events) + transport-race suites (fake sockets, fake timers, controllable bitmap decodes).

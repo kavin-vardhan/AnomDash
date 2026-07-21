@@ -106,6 +106,7 @@ export interface FrameData {
 export type ConnState = 'disconnected' | 'connecting' | 'authenticating' | 'connected' | 'auth_failed'
 
 export interface EventEntry {
+  seq: number
   t: number
   kind: string
   text: string

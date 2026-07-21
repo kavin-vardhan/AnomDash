@@ -228,19 +228,23 @@ describe('snapshot-diff events', () => {
     useStore.getState().setSnapshot(makeSnapshot((s) => { s.capture.running = true }))
     expect(lastEvent()).toMatchObject({ kind: 'capture', text: 'capture started' })
     useStore.getState().setSnapshot(makeSnapshot((s) => { s.capture.framesWritten = 120 }))
-    expect(lastEvent()).toMatchObject({ kind: 'capture', text: 'capture complete (120 frames saved)' })
-  })
-
-  it('setCaptureStopped records state and appends its own event', () => {
-    useStore.getState().setCaptureStopped({ runDir: 'x/session_1', sessionId: 'session_1', frames: 120, maxFrames: 120, seed: 7, at: T0 })
-    expect(useStore.getState().lastCaptureStopped?.frames).toBe(120)
     expect(lastEvent()).toMatchObject({ kind: 'capture', text: 'run complete — 120 frames saved' })
   })
 
-  it('event log is capped at 300 entries', () => {
+  it('setCaptureStopped records state without logging its own event', () => {
+    const before = useStore.getState().events.length
+    useStore.getState().setCaptureStopped({ runDir: 'x/session_1', sessionId: 'session_1', frames: 120, maxFrames: 120, seed: 7, at: T0 })
+    expect(useStore.getState().lastCaptureStopped?.frames).toBe(120)
+    expect(useStore.getState().events).toHaveLength(before)
+  })
+
+  it('event log is capped at 300 entries with unique monotonic seq keys', () => {
     for (let i = 0; i < 305; i++) useStore.getState().pushEvent('system', `e${i}`)
-    expect(useStore.getState().events).toHaveLength(300)
-    expect(useStore.getState().events[299].text).toBe('e304')
+    const events = useStore.getState().events
+    expect(events).toHaveLength(300)
+    expect(events[299].text).toBe('e304')
+    expect(new Set(events.map((e) => e.seq)).size).toBe(300)
+    expect(events[299].seq).toBeGreaterThan(events[0].seq)
   })
 
   it('connection transitions log connect, loss, and restore', () => {

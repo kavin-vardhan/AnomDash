@@ -20,9 +20,11 @@ export function keepOptimistic(e: Optimistic, cur: unknown, prev: unknown, now: 
   return true
 }
 
+let eventSeq = 0
+
 function appendEvent(events: EventEntry[], kind: string, text: string): EventEntry[] {
   const base = events.length >= MAX_EVENTS ? events.slice(-(MAX_EVENTS - 1)) : events.slice()
-  base.push({ t: Date.now(), kind, text })
+  base.push({ seq: ++eventSeq, t: Date.now(), kind, text })
   return base
 }
 
@@ -53,7 +55,7 @@ function deriveSnapshotEvents(prev: Snapshot | null, next: Snapshot): Array<{ ki
     out.push(
       next.capture.running
         ? { kind: 'capture', text: 'capture started' }
-        : { kind: 'capture', text: `capture complete (${next.capture.framesWritten} frames saved)` },
+        : { kind: 'capture', text: `run complete — ${next.capture.framesWritten} frames saved` },
     )
   }
   return out
@@ -164,8 +166,7 @@ export const useStore = create<AppState>((set, get) => ({
     if (prev?.bitmap) prev.bitmap.close()
     set({ frame: f })
   },
-  setCaptureStopped: (d) =>
-    set((st) => ({ lastCaptureStopped: d, events: appendEvent(st.events, 'capture', `run complete — ${d.frames} frames saved`) })),
+  setCaptureStopped: (d) => set({ lastCaptureStopped: d }),
   setCaptureMode: (m) => set({ captureMode: m }),
   selectActor: (name) => set({ selectedActor: name }),
   toggleOverlay: (k) => set((st) => ({ overlay: { ...st.overlay, [k]: !st.overlay[k] } })),

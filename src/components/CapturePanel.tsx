@@ -23,7 +23,7 @@ export function CapturePanel() {
   const [anomalyId, setAnomalyId] = useState('')
 
   const running = useControlValue<boolean>('capture.running', cap?.running ?? false)
-  const { live } = useLive()
+  const { live, connected } = useLive()
 
   const objectAnomalies = useMemo(() => catalog.filter((e) => e.scope === 'object'), [catalog])
 
@@ -115,7 +115,7 @@ export function CapturePanel() {
       <div className="cap-controls">
         {!running
           ? <button disabled={!canStart} onClick={start}>Start capture</button>
-          : <button className="danger" disabled={!live} onClick={stop}>Stop capture</button>}
+          : <button className="danger" disabled={!connected} onClick={stop}>Stop capture</button>}
       </div>
       {!running && targeted && !targetReady && <div className="warn small">pick an object + anomaly</div>}
 

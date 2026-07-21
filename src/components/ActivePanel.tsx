@@ -6,7 +6,7 @@ export function ActivePanel() {
   const liveFires = useStore((s) => s.snapshot?.auto.liveFires ?? [])
   const pendingReverts = useStore((s) => s.pendingReverts)
   const addPendingReverts = useStore((s) => s.addPendingReverts)
-  const { live } = useLive()
+  const { live, connected } = useLive()
 
   const revertingIds = new Set(pendingReverts.map((r) => r.id))
   const shown = active.filter((a) => !revertingIds.has(a.id))
@@ -40,7 +40,7 @@ export function ActivePanel() {
         })}
         {total === 0 && <div className="empty">no active anomalies</div>}
       </div>
-      <button className="danger" disabled={!live || !active.length} onClick={revertAll}>Revert all</button>
+      <button className="danger" disabled={!connected || !active.length} onClick={revertAll}>Revert all</button>
     </div>
   )
 }

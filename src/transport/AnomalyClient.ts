@@ -1,6 +1,7 @@
 import { useStore } from '../store'
 import type { Snapshot, CatalogEntry } from '../types'
 import { isFrameBytes, parseFrameHeader, frameJpegSlice, PROTOCOL_VERSION } from './protocol'
+import { isSnapshot, isCatalog } from './validate'
 
 const AUTH_TIMEOUT_MS = 4000
 
@@ -18,6 +19,7 @@ export class AnomalyClient {
   private lastCaptureRunning = false
   private lastFrameEpoch = -1
   private lastFrameId = -1
+  private warnedMalformed = false
 
   connect(url: string, token: string) {
     this.url = url
@@ -183,6 +185,7 @@ export class AnomalyClient {
         }
         break
       case 'snapshot': {
+        if (!this.guardMalformed(isSnapshot(msg), 'snapshot')) break
         s.setSnapshot(msg as Snapshot)
         const capRunning = !!(msg.capture && msg.capture.running)
         if (capRunning !== this.lastCaptureRunning) {
@@ -192,6 +195,7 @@ export class AnomalyClient {
         break
       }
       case 'catalog':
+        if (!this.guardMalformed(isCatalog(msg), 'catalog')) break
         s.setCatalog((msg.entries ?? []) as CatalogEntry[])
         break
       case 'capture_stopped':
@@ -206,6 +210,16 @@ export class AnomalyClient {
       default:
         break
     }
+  }
+
+  private guardMalformed(ok: boolean, kind: string): boolean {
+    if (ok) return true
+    if (!this.warnedMalformed) {
+      this.warnedMalformed = true
+      console.warn(`malformed ${kind} message dropped — protocol drift?`)
+      useStore.getState().pushEvent('system', `malformed ${kind} message dropped — protocol drift?`)
+    }
+    return false
   }
 
   send(obj: unknown): boolean {

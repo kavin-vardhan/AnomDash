@@ -22,8 +22,8 @@ export function EventLog() {
         </div>
       </div>
       <div className="el-list">
-        {[...shown].reverse().map((e, i) => (
-          <div key={i} className={`el-row ${e.kind}`}>
+        {[...shown].reverse().map((e) => (
+          <div key={e.seq} className={`el-row ${e.kind}`}>
             <span className="el-t">{fmtTime(e.t)}</span>
             <span className={`el-k ${e.kind}`}>{e.kind}</span>
             <span className="el-x">{e.text}</span>
