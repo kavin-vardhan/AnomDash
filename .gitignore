@@ -7,4 +7,5 @@ public/config.json
 .vite
 .DS_Store
 config.bat
+.watcher_alive
 host-tools/ffmpeg/

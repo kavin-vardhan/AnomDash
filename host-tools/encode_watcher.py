@@ -167,12 +167,28 @@ def scan_once(root, ffmpeg, failed):
             failed.add(session_dir)
 
 
+def touch_heartbeat(path):
+    """Refresh the heartbeat file's mtime; never fail the watcher over it.
+
+    Run.bat's self-check reads this mtime to tell "the watcher is running" from "its window is open but
+    the process died". Purely advisory - encoding does not depend on it.
+    """
+    if not path:
+        return
+    try:
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("encode_watcher alive\n")
+    except OSError:
+        return
+
+
 def main():
     ap = argparse.ArgumentParser(description="Auto-encode AnomalyInjector session captures to mp4 (host-side; engine untouched).")
     ap.add_argument("--root", required=True, help="captures root containing session_<ts>_s<seed>/ dirs (REQUIRED - no default)")
     ap.add_argument("--ffmpeg", default="", help="ffmpeg.exe or its bin dir (default: PATH lookup)")
     ap.add_argument("--interval", type=float, default=POLL_SECONDS, help="poll interval seconds")
     ap.add_argument("--once", action="store_true", help="process existing sessions and exit (no watch loop)")
+    ap.add_argument("--heartbeat", default="", help="file to touch each poll so Run.bat's self-check can see this watcher is alive")
     args = ap.parse_args()
 
     ffmpeg = resolve_ffmpeg(args.ffmpeg)
@@ -189,6 +205,7 @@ def main():
     try:
         while True:
             scan_once(args.root, ffmpeg, failed)
+            touch_heartbeat(args.heartbeat)
             if args.once:
                 break
             time.sleep(args.interval)

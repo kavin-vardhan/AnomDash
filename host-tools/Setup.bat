@@ -110,17 +110,12 @@ if not defined CAPTURES_ROOT (
     goto ask_captures
 )
 set "CAPTURES_ROOT=!CAPTURES_ROOT:"=!"
-for %%P in ("!CAPTURES_ROOT!") do set "PARENT=%%~dpP"
-if not exist "!PARENT!" (
-    echo       Parent folder "!PARENT!" does not exist - check the path and try again.
-    goto ask_captures
-)
 if exist "!CAPTURES_ROOT!" goto captures_ok
 choice /m "That folder does not exist yet. Create it now"
 if not !errorlevel! EQU 1 goto ask_captures
 mkdir "!CAPTURES_ROOT!"
 if errorlevel 1 (
-    echo       Could not create it - try again.
+    echo       Could not create it - check the path and try again.
     goto ask_captures
 )
 

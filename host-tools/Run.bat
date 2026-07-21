@@ -26,12 +26,18 @@ if not exist "%PY%" (
     exit /b 1
 )
 
+set "HEARTBEAT=%~dp0.watcher_alive"
+
 echo Launching the encoder watcher and the dashboard in their own windows...
 echo Close both windows to stop.
-start "Anomaly Watcher" cmd /k ""%PY%" "%~dp0host-tools\encode_watcher.py" --ffmpeg "%FFMPEG%" --root "%CAPTURES_ROOT%""
+start "Anomaly Watcher" cmd /k ""%PY%" "%~dp0host-tools\encode_watcher.py" --ffmpeg "%FFMPEG%" --root "%CAPTURES_ROOT%" --heartbeat "%HEARTBEAT%""
 start "Anomaly Dashboard" cmd /k ""%PY%" "%~dp0host-tools\serve_dashboard.py" --directory "%~dp0dashboard" --port %DASH_PORT%"
 
-ping -n 4 127.0.0.1 >nul 2>&1
+ping -n 6 127.0.0.1 >nul 2>&1
 start "" "%DASH_URL%"
 
+"%PY%" "%~dp0host-tools\selfcheck.py" --dashboard-port %DASH_PORT% --heartbeat "%HEARTBEAT%"
+
+echo Leave the two windows open while you capture. This window can be closed.
+pause
 endlocal

@@ -64,6 +64,15 @@ defaults to every interface) and prints a readable message when the port is busy
 **no SPA/index.html fallback** — the app has no client-side router, and a 404 on `config.json` is exactly
 the signal that tells it to open the manual connect screen.
 
+## selfcheck.py
+Run by `Run.bat` a few seconds after it opens its windows, so the most common client mistake — *"I
+forgot to start the game"* — is stated plainly in the launcher window instead of surfacing later as an
+unexplained red dot in the browser. It reports three lines: **dashboard** (TCP probe of the dashboard
+port), **watcher** (heartbeat file touched within 15 s — `encode_watcher.py --heartbeat` refreshes it
+each poll, so a watcher whose window is open but whose process died reads as down), and **game server**
+(TCP probe of `:8077`, the line that carries the "start the game" instruction). Always exits 0 — it is
+information, never a gate.
+
 ## write_config.py
 Creates or updates `dashboard/config.json`: sets `capturesRoot` (normalised to forward slashes),
 **preserves `controlToken` and `serverUrl`**, and fills defaults for anything absent. Called by
