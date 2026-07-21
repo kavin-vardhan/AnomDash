@@ -152,6 +152,16 @@ describe('optimism through the store (m13 gates)', () => {
     expect(useStore.getState().optimistic[PATH]).toBeUndefined()
   })
 
+  it('auth_failed clears optimism and logs the failure', () => {
+    useStore.getState().setConn('connected')
+    snapRadius(15)
+    useStore.getState().setOptimistic(PATH, 2500)
+    useStore.getState().setConn('auth_failed', 'token rejected by server')
+    expect(useStore.getState().optimistic).toEqual({})
+    const ev = useStore.getState().events
+    expect(ev[ev.length - 1]).toMatchObject({ kind: 'system', text: 'authentication failed — token rejected by server' })
+  })
+
   it('backstop: a stale snapshot past 10s also drops the entry', () => {
     useStore.getState().setConn('connected')
     snapRadius(15)

@@ -133,8 +133,10 @@ export const useStore = create<AppState>((set, get) => ({
         events = appendEvent(events, 'system', st.everConnected ? 'connection restored' : 'connected to server')
       } else if (c === 'disconnected' && st.everConnected && st.conn !== 'disconnected') {
         events = appendEvent(events, 'system', 'connection lost — reconnecting…')
+      } else if (c === 'auth_failed' && st.conn !== 'auth_failed') {
+        events = appendEvent(events, 'system', `authentication failed${err ? ` — ${err}` : ''}`)
       }
-      const cleared = c === 'disconnected' ? { optimistic: {}, pendingInjects: [], pendingReverts: [] } : {}
+      const cleared = c === 'disconnected' || c === 'auth_failed' ? { optimistic: {}, pendingInjects: [], pendingReverts: [] } : {}
       return { conn: c, lastError: err, everConnected: st.everConnected || c === 'connected', events, ...cleared }
     }),
   setCreds: (wsUrl, token) => {

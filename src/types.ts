@@ -104,7 +104,7 @@ export interface FrameData {
   h: number
 }
 
-export type ConnState = 'disconnected' | 'connecting' | 'authenticating' | 'connected'
+export type ConnState = 'disconnected' | 'connecting' | 'authenticating' | 'connected' | 'auth_failed'
 
 export interface EventEntry {
   t: number

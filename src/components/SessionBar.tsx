@@ -73,12 +73,11 @@ export function SessionBar() {
   const session = useStore((s) => s.snapshot?.session)
   const auto = useStore((s) => s.snapshot?.auto)
   const { live } = useLive()
-  const reconnecting = conn !== 'connected'
 
   return (
     <div className="session-bar">
       <span className={`dot ${conn === 'connected' ? 'ok' : 'bad'}`} />
-      <span className="conn">{reconnecting ? `reconnecting (${conn})` : 'connected'}</span>
+      <span className="conn">{conn === 'connected' ? 'connected' : conn === 'auth_failed' ? 'token rejected' : `reconnecting (${conn})`}</span>
       <span className="sep" />
       <span>FPS <b>{session ? Math.round(session.fps) : '—'}</b></span>
       <span>seed <b>{auto ? auto.seed : '—'}</b></span>

@@ -39,8 +39,15 @@ export function ConnectScreen() {
           {busy ? 'Connecting…' : 'Connect'}
         </button>
         <div className={`status ${conn === 'connected' ? 'ok' : busy ? 'wait' : 'bad'}`}>
-          {conn}{lastError ? ` — ${lastError}` : ''}
+          {conn === 'auth_failed' ? 'authentication failed' : conn}{lastError ? ` — ${lastError}` : ''}
         </div>
+        {conn === 'auth_failed' && (
+          <p className="hint warn">
+            The server was reached but did not accept the token. It must match the game's{' '}
+            <code>DefaultGame.ini [AnomalyControlServer] Token</code> (or the token logged by{' '}
+            <code>IAI.Server.Start</code>). Fix the token above and press Connect.
+          </p>
+        )}
         <p className="hint">
           Client build: the token is baked in (<code>VITE_CONTROL_TOKEN</code>) and connects automatically.
           In-editor (PIE): run <code>IAI.Server.Start</code> and copy the token from the Output Log.

@@ -6,9 +6,11 @@ export function ConnectionBanner() {
   const conn = useStore((s) => s.conn)
   if (live) return null
 
-  const message = !connected
-    ? `Not connected (${conn}) — controls disabled.`
-    : 'Stream stalled — engine state unknown. Displayed state may be out of date; controls disabled.'
+  const message = conn === 'auth_failed'
+    ? 'Token rejected by server — if the game restarted with a new token, Disconnect and re-enter it; otherwise Reconnect now to retry.'
+    : !connected
+      ? `Not connected (${conn}) — controls disabled.`
+      : 'Stream stalled — engine state unknown. Displayed state may be out of date; controls disabled.'
 
   return (
     <div className={`conn-banner ${connected ? 'stalled' : 'down'}`}>

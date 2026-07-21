@@ -2,39 +2,75 @@ import { useStore } from '../store'
 import type { Snapshot, CatalogEntry } from '../types'
 import { isFrameBytes, parseFrameHeader, frameJpegSlice, PROTOCOL_VERSION } from './protocol'
 
-class AnomalyClient {
+const AUTH_TIMEOUT_MS = 4000
+
+export class AnomalyClient {
   private ws: WebSocket | null = null
   private url = ''
   private token = ''
   private reconnectDelay = 500
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private authTimer: ReturnType<typeof setTimeout> | null = null
   private intentionalClose = false
 
   private snapshotHz = 5
   private frameHz = 6
   private lastCaptureRunning = false
+  private lastFrameEpoch = -1
+  private lastFrameId = -1
 
   connect(url: string, token: string) {
     this.url = url
     this.token = token
     this.intentionalClose = false
     this.reconnectDelay = 500
+    this.clearReconnectTimer()
+    this.clearAuthTimer()
+    this.closeSocket()
     this.open()
   }
 
   disconnect() {
     this.intentionalClose = true
-    try { this.ws?.close() } catch {   }
-    this.ws = null
+    this.clearReconnectTimer()
+    this.clearAuthTimer()
+    this.closeSocket()
     useStore.getState().hardReset()
   }
 
   reconnect() {
     if (!this.url) return
-    this.intentionalClose = false
-    this.reconnectDelay = 500
-    try { this.ws?.close() } catch {   }
+    this.connect(this.url, this.token)
+  }
+
+  private clearReconnectTimer() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
+  }
+
+  private clearAuthTimer() {
+    if (this.authTimer) {
+      clearTimeout(this.authTimer)
+      this.authTimer = null
+    }
+  }
+
+  private closeSocket() {
+    const ws = this.ws
     this.ws = null
-    this.open()
+    if (ws) {
+      try { ws.close() } catch {   }
+    }
+  }
+
+  private failAuth(reason: string) {
+    this.intentionalClose = true
+    this.clearReconnectTimer()
+    this.clearAuthTimer()
+    this.closeSocket()
+    useStore.getState().setConn('auth_failed', reason)
   }
 
   private subscribe(withFrames: boolean) {
@@ -59,13 +95,24 @@ class AnomalyClient {
     this.ws = ws
 
     ws.onopen = () => {
+      if (this.ws !== ws) return
       useStore.getState().setConn('authenticating')
       this.send({ type: 'hello', token: this.token, v: PROTOCOL_VERSION })
+      this.clearAuthTimer()
+      this.authTimer = setTimeout(() => {
+        if (this.ws !== ws) return
+        this.failAuth('no reply to authentication — wrong token, or the server is unresponsive')
+      }, AUTH_TIMEOUT_MS)
     }
-    ws.onmessage = (ev) => this.onMessage(ev)
+    ws.onmessage = (ev) => {
+      if (this.ws !== ws) return
+      this.onMessage(ev, ws)
+    }
     ws.onerror = () => {   }
     ws.onclose = () => {
+      if (this.ws !== ws) return
       this.ws = null
+      this.clearAuthTimer()
       if (this.intentionalClose) return
       useStore.getState().setConn('disconnected', 'connection closed')
       this.scheduleReconnect()
@@ -75,10 +122,14 @@ class AnomalyClient {
   private scheduleReconnect() {
     const delay = this.reconnectDelay
     this.reconnectDelay = Math.min(this.reconnectDelay * 2, 8000)
-    setTimeout(() => { if (!this.intentionalClose) this.open() }, delay)
+    this.clearReconnectTimer()
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null
+      if (!this.intentionalClose) this.open()
+    }, delay)
   }
 
-  private onMessage(ev: MessageEvent) {
+  private onMessage(ev: MessageEvent, sock: WebSocket) {
     let bytes: Uint8Array
     if (typeof ev.data === 'string') {
       bytes = new TextEncoder().encode(ev.data)
@@ -90,7 +141,16 @@ class AnomalyClient {
       const h = parseFrameHeader(bytes)
       const blob = new Blob([new Uint8Array(frameJpegSlice(bytes))], { type: 'image/jpeg' })
       createImageBitmap(blob)
-        .then((bitmap) => useStore.getState().setFrame({ bitmap, frameId: h.frameId, epoch: h.epoch, w: h.w, h: h.h }))
+        .then((bitmap) => {
+          const stale = this.ws !== sock || (h.epoch === this.lastFrameEpoch && h.frameId <= this.lastFrameId)
+          if (stale) {
+            bitmap.close()
+            return
+          }
+          this.lastFrameEpoch = h.epoch
+          this.lastFrameId = h.frameId
+          useStore.getState().setFrame({ bitmap, frameId: h.frameId, epoch: h.epoch, w: h.w, h: h.h })
+        })
         .catch(() => {   })
       return
     }
@@ -108,11 +168,19 @@ class AnomalyClient {
     const s = useStore.getState()
     switch (msg?.type) {
       case 'welcome':
+        this.clearAuthTimer()
         s.setConn('connected')
         this.reconnectDelay = 500
         this.lastCaptureRunning = false
+        this.lastFrameEpoch = -1
+        this.lastFrameId = -1
         this.subscribe(true)
         this.send({ type: 'list_anomalies' })
+        break
+      case 'error':
+        if (msg?.code === 'bad_token' && s.conn === 'authenticating') {
+          this.failAuth('token rejected by server')
+        }
         break
       case 'snapshot': {
         s.setSnapshot(msg as Snapshot)
