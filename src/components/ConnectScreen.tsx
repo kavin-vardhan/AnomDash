@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import { useStore } from '../store'
 import { client } from '../transport/AnomalyClient'
-import { BAKED_TOKEN } from '../config'
+import { controlToken, serverUrl } from '../config'
 
 export function ConnectScreen() {
   const conn = useStore((s) => s.conn)
   const wsUrl0 = useStore((s) => s.wsUrl)
   const token0 = useStore((s) => s.token)
   const lastError = useStore((s) => s.lastError)
-  const [url, setUrl] = useState(wsUrl0)
-  const [token, setToken] = useState(BAKED_TOKEN || token0)
+  const [url, setUrl] = useState(wsUrl0 || serverUrl())
+  const [token, setToken] = useState(controlToken() || token0)
   const busy = conn === 'connecting' || conn === 'authenticating'
 
   const connect = () => {
@@ -43,14 +43,17 @@ export function ConnectScreen() {
         </div>
         {conn === 'auth_failed' && (
           <p className="hint warn">
-            The server was reached but did not accept the token. It must match the game's{' '}
-            <code>DefaultGame.ini [AnomalyControlServer] Token</code> (or the token logged by{' '}
-            <code>IAI.Server.Start</code>). Fix the token above and press Connect.
+            The server was reached but did not accept the token. The <code>controlToken</code> in{' '}
+            <code>config.json</code> (next to this app) must match the game's{' '}
+            <code>DefaultGame.ini [AnomalyControlServer] Token</code> — or the token logged by{' '}
+            <code>IAI.Server.Start</code>. Fix <code>config.json</code> and reload, or paste the token above
+            and press Connect.
           </p>
         )}
         <p className="hint">
-          Client build: the token is baked in (<code>VITE_CONTROL_TOKEN</code>) and connects automatically.
-          In-editor (PIE): run <code>IAI.Server.Start</code> and copy the token from the Output Log.
+          The token is read at startup from <code>config.json</code> next to this app; when it is present the
+          dashboard connects automatically. In-editor (PIE): run <code>IAI.Server.Start</code> and copy the
+          token from the Output Log.
         </p>
       </div>
     </div>

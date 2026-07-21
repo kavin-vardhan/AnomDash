@@ -3,6 +3,7 @@ dist
 dist-ssr
 *.local
 .env
+public/config.json
 .vite
 .DS_Store
 config.bat

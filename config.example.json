@@ -1,0 +1,5 @@
+{
+  "controlToken": "PASTE-THE-SAME-VALUE-AS-DefaultGame.ini-[AnomalyControlServer]-Token",
+  "capturesRoot": "",
+  "serverUrl": "ws://127.0.0.1:8077"
+}

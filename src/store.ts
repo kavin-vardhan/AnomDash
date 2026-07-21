@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { Snapshot, CatalogEntry, FrameData, ConnState, EventEntry } from './types'
-import { DEFAULT_WS_URL, TOKEN_STORAGE_KEY, WSURL_STORAGE_KEY, loadStored, storeValue } from './config'
+import { TOKEN_STORAGE_KEY, WSURL_STORAGE_KEY, loadStored, storeValue } from './config'
 
 const MAX_EVENTS = 300
 const PENDING_BACKSTOP_MS = 10000
@@ -109,7 +109,7 @@ interface AppState {
 export const useStore = create<AppState>((set, get) => ({
   conn: 'disconnected',
   everConnected: false,
-  wsUrl: loadStored(WSURL_STORAGE_KEY, DEFAULT_WS_URL),
+  wsUrl: loadStored(WSURL_STORAGE_KEY, ''),
   token: loadStored(TOKEN_STORAGE_KEY, ''),
   snapshot: null,
   catalog: [],
