@@ -218,22 +218,15 @@ export class AnomalyClient {
     return false
   }
 
-  listAnomalies() { return this.send({ type: 'list_anomalies' }) }
-  inject(anomaly: string, target: string, args: string[]) { return this.send({ type: 'inject', anomaly, target, args }) }
   revert(anomaly: string) { return this.send({ type: 'revert', anomaly }) }
   revertAll() { return this.send({ type: 'revert_all' }) }
   setViewportScoping(enabled: boolean) { return this.send({ type: 'set_viewport_scoping', enabled }) }
   setHud(which: 'selector' | 'auto', enabled: boolean) { return this.send({ type: 'set_hud', which, enabled }) }
-  requestFrame() { return this.send({ type: 'request_frame' }) }
   setPollRadius(cm: number) { return this.send({ type: 'set_poll_radius', cm }) }
   setMinScreenCoverage(pct: number) { return this.send({ type: 'set_min_screen_coverage', pct }) }
   autoConfig(cfg: Record<string, unknown>) { return this.send({ type: 'auto_config', ...cfg }) }
-  autoRun(running: boolean) { return this.send({ type: 'auto_run', running }) }
-  autoStep(seconds: number) { return this.send({ type: 'auto_step', seconds }) }
-  autoFireOnce() { return this.send({ type: 'auto_fire_once' }) }
   captureStart(opts: Record<string, unknown>) { return this.send({ type: 'capture_start', ...opts }) }
   captureStop() { return this.send({ type: 'capture_stop' }) }
-  captureStatus() { return this.send({ type: 'capture_status' }) }
 }
 
 export const client = new AnomalyClient()

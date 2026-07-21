@@ -60,7 +60,6 @@ function deriveSnapshotEvents(prev: Snapshot | null, next: Snapshot): Array<{ ki
 }
 
 interface Optimistic { value: unknown; baseline: unknown; until: number }
-interface PendingInject { id: string; target: string; source: string; at: number }
 interface PendingRevert { id: string; at: number }
 interface CaptureStopped {
   runDir: string; sessionId: string; frames: number; maxFrames: number; seed: number; at: number
@@ -87,7 +86,6 @@ interface AppState {
   events: EventEntry[]
 
   optimistic: Record<string, Optimistic>
-  pendingInjects: PendingInject[]
   pendingReverts: PendingRevert[]
 
   setConn: (c: ConnState, err?: string) => void
@@ -101,7 +99,6 @@ interface AppState {
   toggleOverlay: (k: 'boxes' | 'labels' | 'active') => void
   pushEvent: (kind: string, text: string) => void
   setOptimistic: (path: string, value: unknown) => void
-  addPendingInject: (id: string, target: string, source?: string) => void
   addPendingReverts: (ids: string[]) => void
   tick: () => void
   hardReset: () => void
@@ -123,7 +120,6 @@ export const useStore = create<AppState>((set, get) => ({
   overlay: { boxes: true, labels: true, active: true },
   events: [],
   optimistic: {},
-  pendingInjects: [],
   pendingReverts: [],
 
   setConn: (c, err) =>
@@ -136,7 +132,7 @@ export const useStore = create<AppState>((set, get) => ({
       } else if (c === 'auth_failed' && st.conn !== 'auth_failed') {
         events = appendEvent(events, 'system', `authentication failed${err ? ` — ${err}` : ''}`)
       }
-      const cleared = c === 'disconnected' || c === 'auth_failed' ? { optimistic: {}, pendingInjects: [], pendingReverts: [] } : {}
+      const cleared = c === 'disconnected' || c === 'auth_failed' ? { optimistic: {}, pendingReverts: [] } : {}
       return { conn: c, lastError: err, everConnected: st.everConnected || c === 'connected', events, ...cleared }
     }),
   setCreds: (wsUrl, token) => {
@@ -154,13 +150,12 @@ export const useStore = create<AppState>((set, get) => ({
         if (keepOptimistic(e, resolvePath(s, path), resolvePath(prevSnap, path), now)) optimistic[path] = e
       }
       const activeIds = new Set(s.active.map((a) => a.id))
-      const pendingInjects = st.pendingInjects.filter((p) => !activeIds.has(p.id) && now - p.at < ACTIVE_TTL)
       const pendingReverts = st.pendingReverts.filter((r) => activeIds.has(r.id) && now - r.at < ACTIVE_TTL)
 
       let events = st.events
       for (const d of deriveSnapshotEvents(st.snapshot, s)) events = appendEvent(events, d.kind, d.text)
 
-      return { snapshot: s, optimistic, pendingInjects, pendingReverts, events, lastSnapshotAt: now, stalled: false }
+      return { snapshot: s, optimistic, pendingReverts, events, lastSnapshotAt: now, stalled: false }
     }),
 
   setCatalog: (c) => set({ catalog: c.filter((e) => !HIDDEN_ANOMALY_IDS.has(e.id)) }),
@@ -183,8 +178,6 @@ export const useStore = create<AppState>((set, get) => ({
         [path]: { value, baseline: resolvePath(st.snapshot, path), until: Date.now() + PENDING_BACKSTOP_MS },
       },
     })),
-  addPendingInject: (id, target, source = 'manual') =>
-    set((st) => ({ pendingInjects: [...st.pendingInjects.filter((p) => p.id !== id), { id, target, source, at: Date.now() }] })),
   addPendingReverts: (ids) =>
     set((st) => {
       const have = new Set(st.pendingReverts.map((r) => r.id))
@@ -213,7 +206,7 @@ export const useStore = create<AppState>((set, get) => ({
     if (prev?.bitmap) prev.bitmap.close()
     set({
       conn: 'disconnected', everConnected: false, snapshot: null, frame: null, catalog: [],
-      captureMode: 'auto', selectedActor: null, optimistic: {}, pendingInjects: [], pendingReverts: [],
+      captureMode: 'auto', selectedActor: null, optimistic: {}, pendingReverts: [],
       lastSnapshotAt: 0, stalled: false,
     })
   },

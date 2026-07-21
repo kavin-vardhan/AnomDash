@@ -22,7 +22,6 @@ export interface ActiveAnomaly {
   args: string[]
   source: string
   tActive: number
-  secondsRemaining?: number
 }
 
 export interface LiveFire {

@@ -4,22 +4,19 @@ import { client } from '../transport/AnomalyClient'
 export function ActivePanel() {
   const active = useStore((s) => s.snapshot?.active ?? [])
   const liveFires = useStore((s) => s.snapshot?.auto.liveFires ?? [])
-  const pendingInjects = useStore((s) => s.pendingInjects)
   const pendingReverts = useStore((s) => s.pendingReverts)
   const addPendingReverts = useStore((s) => s.addPendingReverts)
   const { live } = useLive()
 
   const revertingIds = new Set(pendingReverts.map((r) => r.id))
-  const activeIds = new Set(active.map((a) => a.id))
   const shown = active.filter((a) => !revertingIds.has(a.id))
-  const pendingShown = pendingInjects.filter((p) => !activeIds.has(p.id))
 
   const countdown = (id: string): number | undefined => liveFires.find((f) => f.id === id)?.secondsRemaining
 
   const revertOne = (id: string) => { if (client.revert(id)) addPendingReverts([id]) }
   const revertAll = () => { if (client.revertAll()) addPendingReverts(active.map((a) => a.id)) }
 
-  const total = shown.length + pendingShown.length
+  const total = shown.length
 
   return (
     <div className="panel active">
@@ -41,15 +38,6 @@ export function ActivePanel() {
             </div>
           )
         })}
-        {pendingShown.map((p) => (
-          <div key={`p:${p.id}`} className="arow pending">
-            <div className="arow-main">
-              <span className="aid">{p.id}</span>
-              <span className="atarget">{p.target || '(global)'}</span>
-            </div>
-            <div className="arow-meta"><span className="dim">injecting…</span></div>
-          </div>
-        ))}
         {total === 0 && <div className="empty">no active anomalies</div>}
       </div>
       <button className="danger" disabled={!live || !active.length} onClick={revertAll}>Revert all</button>
