@@ -45,7 +45,7 @@ export async function loadRuntimeConfig(): Promise<RuntimeConfig> {
       console.info(`config.json not found (HTTP ${res.status}) — ${ABSENT}`)
       return current
     }
-    const text = await res.text()
+    const text = (await res.text()).replace(/^﻿/, '')
     if (text.trim().startsWith('<')) {
       console.info(`config.json not found (the server returned a page instead) — ${ABSENT}`)
       return current

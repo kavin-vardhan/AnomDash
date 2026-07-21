@@ -14,7 +14,7 @@ echo   Anomaly capture - one-time setup
 echo ============================================================
 echo.
 
-if not exist "%DASHBOARD%\package.json" (
+if not exist "%DASHBOARD%\index.html" (
     echo ERROR: dashboard folder not found at "%DASHBOARD%".
     echo Setup.bat must sit at the delivery root, next to the dashboard and host-tools folders.
     echo.
@@ -29,7 +29,7 @@ if not exist "%HOSTTOOLS%\encode_watcher.py" (
     exit /b 1
 )
 
-echo [1/4] Locating ffmpeg...
+echo [1/3] Locating ffmpeg...
 set "FFMPEG="
 for /f "delims=" %%I in ('where ffmpeg 2^>nul') do if not defined FFMPEG set "FFMPEG=%%~fI"
 if defined FFMPEG (
@@ -83,7 +83,7 @@ echo       captures stay valid and encode later.
 
 :ffmpeg_done
 echo.
-echo [2/4] Locating Python...
+echo [2/3] Locating Python...
 set "PY="
 for /f "delims=" %%I in ('where py 2^>nul') do if not defined PY set "PY=%%~fI"
 if not defined PY for /f "delims=" %%I in ('where python 2^>nul') do if not defined PY set "PY=%%~fI"
@@ -100,7 +100,7 @@ exit /b 1
 
 :python_done
 echo.
-echo [3/4] Captures directory...
+echo [3/3] Captures directory...
 
 :ask_captures
 set "CAPTURES_ROOT="
@@ -126,21 +126,18 @@ if errorlevel 1 (
 
 :captures_ok
 echo       captures root: !CAPTURES_ROOT!
-echo.
-echo [4/4] Installing dashboard dependencies...
-pushd "%DASHBOARD%"
-call npm.cmd install
-set "NPMERR=!errorlevel!"
-popd
-if not "!NPMERR!"=="0" echo       WARNING: npm install reported an error (exit !NPMERR!). You can re-run Setup.bat.
 
 echo.
 echo Writing config...
 > "%CONFIG%" echo set "FFMPEG=!FFMPEG!"
 >> "%CONFIG%" echo set "CAPTURES_ROOT=!CAPTURES_ROOT!"
 >> "%CONFIG%" echo set "PY=!PY!"
-set "CR_FWD=!CAPTURES_ROOT:\=/!"
-> "%DASHBOARD%\.env.local" echo VITE_CAPTURES_ROOT=!CR_FWD!
+
+"!PY!" "%HOSTTOOLS%\write_config.py" --file "%DASHBOARD%\config.json" --captures-root "!CAPTURES_ROOT!"
+if errorlevel 1 (
+    echo       WARNING: could not update "%DASHBOARD%\config.json".
+    echo       The dashboard will still run, but its captures folder box will start empty.
+)
 
 echo.
 echo ============================================================

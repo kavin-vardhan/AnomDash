@@ -91,6 +91,13 @@ describe('loadRuntimeConfig', () => {
     expect(console.warn).not.toHaveBeenCalled()
   })
 
+  it('tolerates a UTF-8 BOM (Windows editors add one)', async () => {
+    stubFetch(() => okRaw('﻿{"controlToken":"TOK"}'))
+    await loadRuntimeConfig()
+    expect(controlToken()).toBe('TOK')
+    expect(console.warn).not.toHaveBeenCalled()
+  })
+
   it('valid JSON is accepted regardless of the served content-type', async () => {
     stubFetch(() => okRaw('{"controlToken":"TOK","capturesRoot":"D:/C"}'))
     await loadRuntimeConfig()

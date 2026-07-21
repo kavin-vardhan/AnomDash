@@ -13,24 +13,61 @@ time, next to the `dashboard/` and `host-tools/` folders:
 ```
 <delivery root>/
   Setup.bat            <- one-time: finds/downloads ffmpeg, finds Python, asks for the captures folder,
-                          runs `npm install`, writes config.bat
+                          writes config.bat + stamps capturesRoot into dashboard/config.json
   Run.bat              <- sources config.bat, then opens two windows: the encoder watcher
-                          (encode_watcher.py --ffmpeg + --root) and the dashboard (`npm run dev -- --open`,
-                          which also opens the browser); guards on missing config.bat / node_modules
+                          (encode_watcher.py --ffmpeg + --root) and the dashboard static server
+                          (serve_dashboard.py --directory dashboard --port 5180), then opens the browser;
+                          guards on missing config.bat / dashboard\index.html
   config.bat           <- written by Setup.bat (machine-specific: FFMPEG, CAPTURES_ROOT, PY); gitignored
-  dashboard/           <- the anomaly-dashboard build
-  host-tools/          <- this folder (encode_watcher.py, overlay_watcher.py, ...)
+  dashboard/           <- the BUILT dashboard: index.html + assets/ + config.json
+  host-tools/          <- this folder (serve_dashboard.py, write_config.py, encode_watcher.py, ...)
 ```
+
+**The client needs Python only — no Node, no `npm install`.** The dashboard is built on the **build
+machine** and delivered as static files:
+
+```
+npm run build                      # on the build machine, in the dashboard repo
+copy dist\*  ->  <delivery root>\dashboard\
+```
+
+`dist/` already contains `config.json` (Vite copies `public/`), but that copy carries the **dev** token —
+overwrite it with the client's, or let the owner author it directly:
+
+```json
+{ "controlToken": "<same value as the game's DefaultGame.ini [AnomalyControlServer] Token>",
+  "capturesRoot": "",
+  "serverUrl": "ws://127.0.0.1:8077" }
+```
+
+`Setup.bat` fills in `capturesRoot` (via `write_config.py`) and **never touches `controlToken`** — the
+token is the owner's to ship. A bundle whose `config.json` has an empty token still runs; the dashboard
+just opens on its manual connect screen instead of connecting automatically.
 
 The `.bat`s use paths relative to their own location (`%~dp0dashboard`, `%~dp0host-tools`,
 `%~dp0config.bat`), so they only work once assembled at the delivery root — they are non-functional from
 this repo location by design. `Run.bat` spawns each child in its own titled window via `start "…" cmd /k`
-(the watcher command is wrapped in an extra quote pair so paths containing spaces survive cmd's
-quote-stripping; the dashboard uses `start /D "…"` to set its working dir). Windows built-ins only
-(`curl.exe` + `tar`); `npm.cmd` is always called explicitly (never bare `npm`) to dodge the PowerShell
-execution-policy wall. The ffmpeg download tries normally first, then retries once with `--ssl-no-revoke`
-if a corporate-network revocation check blocks it. ffmpeg is **fetched, never committed** (the full build
-is GPL): the download URL is a `FFMPEG_URL` variable at the top of `Setup.bat`.
+(each command is wrapped in an extra quote pair so paths containing spaces survive cmd's quote-stripping).
+Windows built-ins only (`curl.exe` + `tar`). The ffmpeg download tries normally first, then retries once
+with `--ssl-no-revoke` if a corporate-network revocation check blocks it. ffmpeg is **fetched, never
+committed** (the full build is GPL): the download URL is a `FFMPEG_URL` variable at the top of `Setup.bat`.
+
+## serve_dashboard.py
+Serves the built dashboard to the browser (`--directory`, `--port`, default **5180** — the dev server's
+5173 is left alone so a packaged bundle and `npm run dev` can run side by side). It is a wrapper rather
+than `python -m http.server` for two reasons that both bite on the *client's* machine, not ours:
+**MIME types are forced** in `extensions_map` (http.server resolves types via the Windows registry, and a
+box whose `HKCR\.js` says `text/plain` serves JavaScript as text/plain → the browser refuses the ES module
+→ blank dashboard), and **`Cache-Control: no-store`** (otherwise a `config.json` rewritten by a re-run of
+`Setup.bat` can keep serving the old token until a hard refresh). It also binds `127.0.0.1` (http.server
+defaults to every interface) and prints a readable message when the port is busy. There is deliberately
+**no SPA/index.html fallback** — the app has no client-side router, and a 404 on `config.json` is exactly
+the signal that tells it to open the manual connect screen.
+
+## write_config.py
+Creates or updates `dashboard/config.json`: sets `capturesRoot` (normalised to forward slashes),
+**preserves `controlToken` and `serverUrl`**, and fills defaults for anything absent. Called by
+`Setup.bat`; JSON editing lives here rather than in the `.bat` to avoid cmd quoting hazards.
 
 ## encode_watcher.py
 Watches the captures directory and auto-runs **ffmpeg** to encode each completed **session** capture (m9)
