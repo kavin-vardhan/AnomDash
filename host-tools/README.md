@@ -8,31 +8,30 @@ of it modifies the engine, the plugin, or the dashboard; it only watches the cap
 
 Two PascalCase launchers are the client-facing surface. Their **repo source-of-truth lives in this
 folder**, but they are authored to run from the **delivery-bundle root** and are placed there at assembly
-time, next to the `dashboard/` and `host-tools/` folders:
+time, next to `Dashboard.exe`, `config.json`, and the `host-tools/` folder:
 
 ```
 <delivery root>/
-  Setup.bat            <- one-time: finds/downloads ffmpeg, finds Python, asks for the captures folder,
-                          writes config.bat + stamps capturesRoot into dashboard/config.json
-  Run.bat              <- sources config.bat, then opens two windows: the encoder watcher
-                          (encode_watcher.py --ffmpeg + --root) and the dashboard static server
-                          (serve_dashboard.py --directory dashboard --port 5180), then opens the browser;
-                          guards on missing config.bat / dashboard\index.html
+  Setup.bat            <- one-time: checks/installs WebView2, finds/downloads ffmpeg, finds Python,
+                          asks for the captures folder, writes config.bat + stamps capturesRoot into config.json
+  Run.bat              <- sources config.bat, launches the encoder watcher (encode_watcher.py) and the
+                          desktop app (Dashboard.exe), then prints a dashboard/watcher/game-server self-check;
+                          guards on missing config.bat / Dashboard.exe
+  Dashboard.exe        <- the Tauri v2 desktop app (frontend embedded; renders in the system WebView2)
+  config.json          <- loose, editable, read at RUNTIME by Dashboard.exe; NOT embedded in the exe
   config.bat           <- written by Setup.bat (machine-specific: FFMPEG, CAPTURES_ROOT, PY); gitignored
-  dashboard/           <- the BUILT dashboard: index.html + assets/ + config.json
-  host-tools/          <- this folder (serve_dashboard.py, write_config.py, encode_watcher.py, ...)
+  host-tools/          <- this folder (encode_watcher.py, selfcheck.py, write_config.py, serve_dashboard.py, ...)
 ```
 
-**The client needs Python only — no Node, no `npm install`.** The dashboard is built on the **build
-machine** and delivered as static files:
+**The client needs Python only — no Node, no `npm install`.** (Python is still required for the encoder
+watcher; the dashboard itself is a native exe.) Build on the **build machine** and copy the exe:
 
 ```
-npm run build                      # on the build machine, in the dashboard repo
-copy dist\*  ->  <delivery root>\dashboard\
+npm run build:tauri && npm run tauri build     # in the dashboard repo (needs Rust >= 1.77.2)
+copy src-tauri\target\release\Dashboard.exe  ->  <delivery root>\Dashboard.exe
 ```
 
-`dist/` already contains `config.json` (Vite copies `public/`), but that copy carries the **dev** token —
-overwrite it with the client's, or let the owner author it directly:
+Then author `<delivery root>\config.json` with the client's token:
 
 ```json
 { "controlToken": "<same value as the game's DefaultGame.ini [AnomalyControlServer] Token>",
@@ -40,17 +39,29 @@ overwrite it with the client's, or let the owner author it directly:
   "serverUrl": "ws://127.0.0.1:8077" }
 ```
 
+**`config.json` is never embedded in the exe** — `build:tauri` deletes `dist/config.json` before Tauri
+compiles the frontend into the binary, and the app reads `config.json` from its own folder at runtime via
+a narrow Rust command. So editing `config.json` changes the token (or captures folder) with **no rebuild**.
 `Setup.bat` fills in `capturesRoot` (via `write_config.py`) and **never touches `controlToken`** — the
-token is the owner's to ship. A bundle whose `config.json` has an empty token still runs; the dashboard
-just opens on its manual connect screen instead of connecting automatically.
+token is the owner's to ship. An empty token still runs; the app just opens on its manual connect screen.
 
-The `.bat`s use paths relative to their own location (`%~dp0dashboard`, `%~dp0host-tools`,
-`%~dp0config.bat`), so they only work once assembled at the delivery root — they are non-functional from
-this repo location by design. `Run.bat` spawns each child in its own titled window via `start "…" cmd /k`
-(each command is wrapped in an extra quote pair so paths containing spaces survive cmd's quote-stripping).
-Windows built-ins only (`curl.exe` + `tar`). The ffmpeg download tries normally first, then retries once
-with `--ssl-no-revoke` if a corporate-network revocation check blocks it. ffmpeg is **fetched, never
-committed** (the full build is GPL): the download URL is a `FFMPEG_URL` variable at the top of `Setup.bat`.
+**WebView2:** the app renders in the system WebView2 runtime (present by default on Win10 21H2+/Win11).
+`Setup.bat` reads the runtime's registry key and, if absent, silent-installs the Evergreen bootstrapper
+(bundled `host-tools\MicrosoftEdgeWebview2Setup.exe`, else downloaded, then `/silent /install`).
+
+**Fallback route (no WebView2 possible on a locked-down box):** the M2 Python-served path still works.
+Build with plain `npm run build` (which keeps `config.json` in `dist/`), put `dist/` in a `dashboard/`
+folder at the delivery root, and serve it with `python host-tools\serve_dashboard.py --directory dashboard
+--port 5180` — `config.json` must sit next to `index.html`. See `serve_dashboard.py` below. This is the
+documented escape hatch, not the default.
+
+The `.bat`s use paths relative to their own location (`%~dp0host-tools`, `%~dp0config.bat`,
+`%~dp0Dashboard.exe`), so they only work once assembled at the delivery root — non-functional from this
+repo location by design. Windows built-ins only (`curl.exe` + `tar`). The ffmpeg download tries normally
+first, then retries once with `--ssl-no-revoke` if a corporate-network revocation check blocks it; the
+WebView2 bootstrapper download does the same. ffmpeg and the WebView2 installer are **fetched, never
+committed** (ffmpeg's full build is GPL; the WebView2 stub is a Microsoft redistributable): the download
+URLs are `FFMPEG_URL` / `WV2URL` variables at the top of `Setup.bat`.
 
 ## serve_dashboard.py
 Serves the built dashboard to the browser (`--directory`, `--port`, default **5180** — the dev server's
@@ -67,16 +78,18 @@ the signal that tells it to open the manual connect screen.
 ## selfcheck.py
 Run by `Run.bat` a few seconds after it opens its windows, so the most common client mistake — *"I
 forgot to start the game"* — is stated plainly in the launcher window instead of surfacing later as an
-unexplained red dot in the browser. It reports three lines: **dashboard** (TCP probe of the dashboard
-port), **watcher** (heartbeat file touched within 15 s — `encode_watcher.py --heartbeat` refreshes it
-each poll, so a watcher whose window is open but whose process died reads as down), and **game server**
-(TCP probe of `:8077`, the line that carries the "start the game" instruction). Always exits 0 — it is
-information, never a gate.
+unexplained problem. It reports three lines: **dashboard** (`--dashboard-exe Dashboard.exe` → a
+`tasklist` process check for the native app; or `--dashboard-port` → a TCP probe, the Python-served
+fallback route), **watcher** (heartbeat file touched within 15 s — `encode_watcher.py --heartbeat`
+refreshes it each poll, so a watcher whose window is open but whose process died reads as down), and
+**game server** (TCP probe of `:8077`, the line that carries the "start the game" instruction). Always
+exits 0 — it is information, never a gate.
 
 ## write_config.py
-Creates or updates `dashboard/config.json`: sets `capturesRoot` (normalised to forward slashes),
-**preserves `controlToken` and `serverUrl`**, and fills defaults for anything absent. Called by
-`Setup.bat`; JSON editing lives here rather than in the `.bat` to avoid cmd quoting hazards.
+Creates or updates `config.json` (at the delivery root, next to `Dashboard.exe`): sets `capturesRoot`
+(normalised to forward slashes), **preserves `controlToken` and `serverUrl`**, and fills defaults for
+anything absent. Called by `Setup.bat`; JSON editing lives here rather than in the `.bat` to avoid cmd
+quoting hazards, and it reads with `utf-8-sig` so a BOM'd config never costs the shipped token.
 
 ## encode_watcher.py
 Watches the captures directory and auto-runs **ffmpeg** to encode each completed **session** capture (m9)

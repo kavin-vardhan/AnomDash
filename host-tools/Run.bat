@@ -1,8 +1,7 @@
 @echo off
 setlocal
 
-set "DASH_PORT=5180"
-set "DASH_URL=http://127.0.0.1:%DASH_PORT%/"
+set "APP=%~dp0Dashboard.exe"
 
 if not exist "%~dp0config.bat" (
     echo config.bat not found. Run Setup.bat first.
@@ -10,9 +9,9 @@ if not exist "%~dp0config.bat" (
     pause
     exit /b 1
 )
-if not exist "%~dp0dashboard\index.html" (
-    echo Dashboard files not found in "%~dp0dashboard".
-    echo That folder should hold the built dashboard: index.html, assets, config.json.
+if not exist "%APP%" (
+    echo Dashboard.exe not found next to Run.bat.
+    echo The delivery folder should contain Dashboard.exe and config.json at its root.
     echo.
     pause
     exit /b 1
@@ -28,16 +27,15 @@ if not exist "%PY%" (
 
 set "HEARTBEAT=%~dp0.watcher_alive"
 
-echo Launching the encoder watcher and the dashboard in their own windows...
-echo Close both windows to stop.
+echo Launching the encoder watcher and the dashboard app...
+echo Close the app window and the watcher window to stop.
 start "Anomaly Watcher" cmd /k ""%PY%" "%~dp0host-tools\encode_watcher.py" --ffmpeg "%FFMPEG%" --root "%CAPTURES_ROOT%" --heartbeat "%HEARTBEAT%""
-start "Anomaly Dashboard" cmd /k ""%PY%" "%~dp0host-tools\serve_dashboard.py" --directory "%~dp0dashboard" --port %DASH_PORT%"
+start "" "%APP%"
 
-ping -n 6 127.0.0.1 >nul 2>&1
-start "" "%DASH_URL%"
+ping -n 5 127.0.0.1 >nul 2>&1
 
-"%PY%" "%~dp0host-tools\selfcheck.py" --dashboard-port %DASH_PORT% --heartbeat "%HEARTBEAT%"
+"%PY%" "%~dp0host-tools\selfcheck.py" --dashboard-exe Dashboard.exe --heartbeat "%HEARTBEAT%"
 
-echo Leave the two windows open while you capture. This window can be closed.
+echo Leave the app and watcher windows open while you capture. This window can be closed.
 pause
 endlocal
