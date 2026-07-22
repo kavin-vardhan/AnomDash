@@ -4,6 +4,9 @@ import {
   DEFAULT_WS_URL, CONFIG_URL,
 } from './config'
 
+const { mockInvoke } = vi.hoisted(() => ({ mockInvoke: vi.fn() }))
+vi.mock('@tauri-apps/api/core', () => ({ invoke: mockInvoke }))
+
 function okResponse(body: unknown) {
   return { ok: true, status: 200, text: async () => JSON.stringify(body) }
 }
@@ -134,5 +137,43 @@ describe('loadRuntimeConfig', () => {
     await loadRuntimeConfig()
     expect(controlToken()).toBe('')
     expect(capturesRoot()).toBe('')
+  })
+})
+
+describe('loadRuntimeConfig (Tauri branch)', () => {
+  beforeEach(() => {
+    mockInvoke.mockReset()
+    vi.stubGlobal('window', { __TAURI_INTERNALS__: {} })
+  })
+
+  it('reads config via the read_config command, not fetch', async () => {
+    const fetchFn = stubFetch(() => okResponse({ controlToken: 'WRONG' }))
+    mockInvoke.mockResolvedValueOnce('{"controlToken":"TOK","capturesRoot":"D:/C"}')
+    await loadRuntimeConfig()
+    expect(mockInvoke).toHaveBeenCalledWith('read_config')
+    expect(fetchFn).not.toHaveBeenCalled()
+    expect(controlToken()).toBe('TOK')
+    expect(capturesRoot()).toBe('D:/C')
+  })
+
+  it('malformed config from the command → defaults + warning', async () => {
+    mockInvoke.mockResolvedValueOnce('{ nope }')
+    await loadRuntimeConfig()
+    expect(controlToken()).toBe('')
+    expect(console.warn).toHaveBeenCalled()
+  })
+
+  it('command error (config absent next to the exe) → defaults + info, no throw', async () => {
+    mockInvoke.mockRejectedValueOnce(new Error('The system cannot find the file specified.'))
+    await expect(loadRuntimeConfig()).resolves.toBeDefined()
+    expect(controlToken()).toBe('')
+    expect(console.info).toHaveBeenCalled()
+  })
+
+  it('tolerates a UTF-8 BOM from the command', async () => {
+    mockInvoke.mockResolvedValueOnce('﻿{"controlToken":"TOK"}')
+    await loadRuntimeConfig()
+    expect(controlToken()).toBe('TOK')
+    expect(console.warn).not.toHaveBeenCalled()
   })
 })
