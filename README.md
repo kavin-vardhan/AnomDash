@@ -48,16 +48,32 @@ is *stored (typed) > `config.serverUrl` > built-in default*.
 > `npm run build` copies `public/config.json` into `dist/`, so `dist/config.json` carries your **dev**
 > token until you overwrite it at assembly time.
 
-## Client delivery (no Node on the client machine)
-The client is served a **prebuilt** `dist/` by Python — `host-tools/serve_dashboard.py` on port **5180**
-(the dev server keeps 5173, so both can run at once). Build here, copy `dist/*` plus a token-bearing
-`config.json` into the bundle's `dashboard/` folder; the client runs `Setup.bat` then `Run.bat` and needs
-**Python only**. See `host-tools/README.md` for assembly and why the server is a wrapper rather than
-`python -m http.server` (forced MIME types, `no-store`), and the plugin's `docs/PRE-DELIVERY-CHECKLIST.md`
-before shipping.
+## Desktop app (Tauri v2) — the client default
+The client double-clicks **`Dashboard.exe`** (a ~8 MB Tauri v2 app — system WebView2, no bundled Chromium,
+no browser, no terminal). Build on a machine with **Rust ≥ 1.77.2**:
 
-`ws://` is not subject to CORS/same-origin, so a page served from `:5173`/`:5180` connecting to `:8077`
-works directly.
+```
+npm run build:tauri && npm run tauri build     # produces src-tauri/target/release/Dashboard.exe
+```
+
+Copy that exe to the delivery root next to a token-bearing `config.json`; the client runs `Setup.bat`
+(which also checks/installs WebView2) then `Run.bat` (launches the app + the encoder watcher) and needs
+**Python only** (for the encoder). `src-tauri/` holds the shell; `src/config.ts` reads `config.json` in a
+Tauri build via a narrow Rust `read_config` command (from the exe's own folder) and in a browser build via
+`fetch('./config.json')` — same three degradations either way.
+
+**`config.json` is never embedded in the exe** — `build:tauri` strips `dist/config.json` before Tauri
+compiles the frontend in, and the app reads the loose file at runtime, so the token stays editable with no
+rebuild (this is the M2 footgun-fix, preserved). The CSP in `src-tauri/tauri.conf.json` permits the
+localhost control-server WS. Unsigned exe → a one-time SmartScreen "More info → Run anyway" is expected.
+
+**Fallback (no WebView2 possible):** the M2 Python-served route still works — `host-tools/serve_dashboard.py`
+serves a plain `npm run build` `dist/` on port **5180** (dev keeps 5173). See `host-tools/README.md`; a
+wrapper rather than `python -m http.server` for forced MIME types + `no-store`. The plugin's
+`docs/PRE-DELIVERY-CHECKLIST.md` is the pre-ship gate.
+
+`ws://` is not subject to CORS/same-origin, so the app (and any page served from `:5173`/`:5180`) connects
+to `:8077` directly.
 
 ## Transport — the one rule
 Every server→client message arrives as a WS **binary** frame (libwebsockets), *including JSON*. The client is
@@ -90,6 +106,12 @@ otherwise UTF-8 JSON. It never assumes a text opcode. See `src/transport/`.
   `Setup.bat` stamps `capturesRoot` while preserving the shipped token, and `Run.bat` prints a
   dashboard/watcher/game-server status check. Delivery docs + the new pre-delivery checklist landed in the
   **plugin** repo (`AnomInject`). See `docs/sessions/2026-07-21-021-runtime-config-static-dist.md`.
+- **M3 (desktop app, 2026-07-21):** the client default became a double-click **`Dashboard.exe`** (Tauri v2,
+  ~8 MB, system WebView2) — no browser, no terminal. `config.ts` gained a Tauri branch that reads the
+  **external** `config.json` via a Rust `read_config` command (never embedded — the M2 footgun-fix is
+  preserved); the browser/Python route is untouched and kept as the documented fallback. `Run.bat` launches
+  the exe; `Setup.bat` checks/installs WebView2. Plugin repo (`AnomInject`) got the delivery-doc update +
+  gotcha G85. See `docs/sessions/2026-07-21-022-tauri-desktop-wrap.md`.
 
 ## Design notes
 Milestone design notes / journals live in `docs/sessions/NNN-*.md` (numbered to stay aligned with the
