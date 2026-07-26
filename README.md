@@ -112,6 +112,15 @@ otherwise UTF-8 JSON. It never assumes a text opcode. See `src/transport/`.
   preserved); the browser/Python route is untouched and kept as the documented fallback. `Run.bat` launches
   the exe; `Setup.bat` checks/installs WebView2. Plugin repo (`AnomInject`) got the delivery-doc update +
   gotcha G85. See `docs/sessions/2026-07-21-022-tauri-desktop-wrap.md`.
+- **Design round Stage 1 (2026-07-26):** the token foundation. `src/tokens.css` holds the approved palette
+  (`--void/--panel/--raised/--line/--text/--iris` + `--dim/--faint/--iris-light/--iris-ink`), the four state
+  colors, the type scale, spacing 4–32, radii 3/4/8 and the iris focus ring — **reference tokens, never raw
+  hex**. IBM Plex Sans + Mono are **self-hosted and bundled** (no CDN; the app ships offline), with **mono
+  reserved for data** and Plex Sans for everything conversational. New **status spine**: a 2px state-colored
+  top edge plus the state word, driven by `src/lib/status.ts`
+  (`OFFLINE > STALLED > CAPTURING > LIVE`). The preview canvas now sizes its backing store from the
+  container × `devicePixelRatio`, including monitor-to-monitor DPR changes. Stage 2 (per-panel screens,
+  reticle language, reflow, copy) is separate. See `docs/sessions/2026-07-26-023-design-stage1-tokens.md`.
 
 ## Design notes
 Milestone design notes / journals live in `docs/sessions/NNN-*.md` (numbered to stay aligned with the
