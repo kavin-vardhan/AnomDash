@@ -1,10 +1,20 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import { useStore } from '../store'
 import { isNearFullscreen, pickActorAt, rectArea } from '../lib/geom'
 
-const CW = 960
-const CH = 540
+const FALLBACK_W = 960
+const FALLBACK_H = 540
+
+function token(name: string, fallback: string): string {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return v || fallback
+}
+
+function fit(c: HTMLCanvasElement, w: number, h: number) {
+  if (c.width !== w) c.width = w
+  if (c.height !== h) c.height = h
+}
 
 export function PreviewCanvas() {
   const frame = useStore((s) => s.frame)
@@ -13,25 +23,90 @@ export function PreviewCanvas() {
   const overlay = useStore((s) => s.overlay)
   const toggleOverlay = useStore((s) => s.toggleOverlay)
   const selectActor = useStore((s) => s.selectActor)
+  const wrap = useRef<HTMLDivElement>(null)
   const frameCanvas = useRef<HTMLCanvasElement>(null)
   const overlayCanvas = useRef<HTMLCanvasElement>(null)
+
+  const [cssSize, setCssSize] = useState({ w: FALLBACK_W, h: FALLBACK_H })
+  const [dpr, setDpr] = useState(() => (typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1))
+
+  useLayoutEffect(() => {
+    const el = wrap.current
+    if (!el) return
+    const measure = () => {
+      const r = el.getBoundingClientRect()
+      if (r.width <= 0 || r.height <= 0) return
+      setCssSize((prev) => (prev.w === r.width && prev.h === r.height ? prev : { w: r.width, h: r.height }))
+    }
+    measure()
+    let ro: ResizeObserver | null = null
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(measure)
+      ro.observe(el)
+    }
+    window.addEventListener('resize', measure)
+    return () => {
+      ro?.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    let mq: MediaQueryList | null = null
+    let stopped = false
+    const onChange = () => {
+      if (stopped) return
+      setDpr(window.devicePixelRatio || 1)
+      detach()
+      arm()
+    }
+    const detach = () => {
+      if (!mq) return
+      if (mq.removeEventListener) mq.removeEventListener('change', onChange)
+      else mq.removeListener(onChange)
+      mq = null
+    }
+    const arm = () => {
+      if (stopped) return
+      mq = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`)
+      if (mq.addEventListener) mq.addEventListener('change', onChange)
+      else mq.addListener(onChange)
+    }
+    arm()
+    return () => { stopped = true; detach() }
+  }, [])
+
+  const bw = Math.max(1, Math.round(cssSize.w * dpr))
+  const bh = Math.max(1, Math.round(cssSize.h * dpr))
+  const scale = cssSize.w > 0 ? bw / cssSize.w : 1
 
   useEffect(() => {
     const c = frameCanvas.current
     const ctx = c?.getContext('2d')
     if (!c || !ctx) return
-    if (frame?.bitmap) ctx.drawImage(frame.bitmap, 0, 0, c.width, c.height)
-    else { ctx.fillStyle = '#05070a'; ctx.fillRect(0, 0, c.width, c.height) }
-  }, [frame])
+    fit(c, bw, bh)
+    if (frame?.bitmap) {
+      ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(frame.bitmap, 0, 0, c.width, c.height)
+    } else {
+      ctx.fillStyle = token('--void', '#0A0D14')
+      ctx.fillRect(0, 0, c.width, c.height)
+    }
+  }, [frame, bw, bh])
 
   useEffect(() => {
     const c = overlayCanvas.current
     const ctx = c?.getContext('2d')
     if (!c || !ctx) return
+    fit(c, bw, bh)
     ctx.clearRect(0, 0, c.width, c.height)
     if (!snapshot) return
     if (frame && frame.epoch !== snapshot.epoch) return
 
+    const iris = token('--iris', '#828CF8')
+    const irisLight = token('--iris-light', '#A5ADFF')
+    const capturing = token('--capturing', '#45C4E9')
     const activeTargets = new Set(snapshot.active.map((a) => a.target).filter(Boolean))
 
     for (const v of snapshot.visible) {
@@ -43,26 +118,28 @@ export function PreviewCanvas() {
       const isActive = activeTargets.has(v.name)
 
       if (overlay.boxes) {
-        ctx.lineWidth = isSel ? 2.5 : 1
-        ctx.strokeStyle = isSel ? '#ecc94b' : near ? 'rgba(120,130,140,0.22)' : 'rgba(99,179,237,0.8)'
+        ctx.lineWidth = (isSel ? 2.5 : 1) * scale
+        ctx.strokeStyle = isSel ? iris : near ? 'rgba(140,165,200,0.22)' : 'rgba(140,165,200,0.5)'
         ctx.strokeRect(x, y, w, h)
       }
       if (overlay.active && isActive) {
-        ctx.lineWidth = 2.5
-        ctx.strokeStyle = '#f56565'
+        ctx.lineWidth = 2.5 * scale
+        ctx.strokeStyle = capturing
         ctx.strokeRect(x, y, w, h)
       }
       if (overlay.labels && !near && (isSel || isActive || rectArea(v.rect) < 0.15)) {
-        ctx.font = '11px ui-monospace, monospace'
+        const fs = 11 * scale
+        ctx.font = `${fs}px 'IBM Plex Mono', ui-monospace, monospace`
         const label = v.name
         const tw = ctx.measureText(label).width
-        ctx.fillStyle = 'rgba(5,7,10,0.7)'
-        ctx.fillRect(x, Math.max(0, y - 13), tw + 6, 13)
-        ctx.fillStyle = isSel ? '#ecc94b' : isActive ? '#fc8181' : 'rgba(200,215,230,0.95)'
-        ctx.fillText(label, x + 3, Math.max(10, y - 3))
+        const boxH = 13 * scale
+        ctx.fillStyle = 'rgba(10,13,20,0.7)'
+        ctx.fillRect(x, Math.max(0, y - boxH), tw + 6 * scale, boxH)
+        ctx.fillStyle = isSel ? irisLight : isActive ? capturing : 'rgba(200,215,230,0.9)'
+        ctx.fillText(label, x + 3 * scale, Math.max(fs, y - 3 * scale))
       }
     }
-  }, [snapshot, frame, selected, overlay])
+  }, [snapshot, frame, selected, overlay, bw, bh, scale])
 
   const onClick = (e: ReactMouseEvent<HTMLCanvasElement>) => {
     const c = overlayCanvas.current
@@ -85,9 +162,9 @@ export function PreviewCanvas() {
           {selected ? ` · sel ${selected}` : ''}
         </span>
       </div>
-      <div className="canvas-wrap">
-        <canvas ref={frameCanvas} width={CW} height={CH} className="frame-canvas" />
-        <canvas ref={overlayCanvas} width={CW} height={CH} className="overlay-canvas" onClick={onClick} />
+      <div className="canvas-wrap" ref={wrap}>
+        <canvas ref={frameCanvas} className="frame-canvas" />
+        <canvas ref={overlayCanvas} className="overlay-canvas" onClick={onClick} />
       </div>
     </div>
   )
