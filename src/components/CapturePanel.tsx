@@ -123,8 +123,8 @@ export function CapturePanel() {
         <div className="cap-status live">
           <span className="rec">● recording</span> — <b>{cap.framesWritten}</b>{maxFrames > 0 ? <> / {maxFrames} frames <span className="dim">({pct}%)</span></> : <> frames saved</>}
           {maxFrames > 0 && (
-            <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.12)', marginTop: 6, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${pct}%`, background: '#e0483d', transition: 'width 0.15s linear' }} />
+            <div className="cap-progress">
+              <div className="cap-progress-fill" style={{ ['--pct' as string]: `${pct}%` }} />
             </div>
           )}
           <div className="dim" title={cap.runDir}>{cap.sessionId || basename(cap.runDir)}</div>

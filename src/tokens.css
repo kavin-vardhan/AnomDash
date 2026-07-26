@@ -1,0 +1,80 @@
+:root {
+  --void: #0A0D14;
+  --panel: #121724;
+  --raised: #1A2130;
+  --line: #273043;
+  --text: #E6EAF3;
+  --iris: #828CF8;
+
+  --dim: #8E97AC;
+  --faint: #5C6478;
+  --iris-light: #A5ADFF;
+  --iris-ink: #07090F;
+
+  --live: #3ECF8E;
+  --stalled: #E5A83B;
+  --offline: #F25C54;
+  --capturing: #45C4E9;
+
+  --live-glow: rgba(62, 207, 142, 0.6);
+  --stalled-glow: rgba(229, 168, 59, 0.6);
+  --offline-glow: rgba(242, 92, 84, 0.6);
+  --capturing-glow: rgba(69, 196, 233, 0.6);
+
+  --live-tint: rgba(62, 207, 142, 0.1);
+  --stalled-tint: rgba(229, 168, 59, 0.1);
+  --offline-tint: rgba(242, 92, 84, 0.12);
+  --capturing-tint: rgba(69, 196, 233, 0.1);
+
+  --live-edge: rgba(62, 207, 142, 0.4);
+  --stalled-edge: rgba(229, 168, 59, 0.5);
+  --offline-edge: rgba(242, 92, 84, 0.5);
+  --capturing-edge: rgba(69, 196, 233, 0.4);
+
+  --iris-tint: rgba(130, 140, 248, 0.12);
+  --iris-edge: rgba(130, 140, 248, 0.5);
+
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, Segoe UI, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+
+  --fs-display: 20px;
+  --fs-title: 12px;
+  --fs-body: 13px;
+  --fs-micro: 11px;
+  --fs-data: 12px;
+  --fs-data-lg: 18px;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+
+  --tr-title: 0.08em;
+  --tr-micro: 0.06em;
+
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+
+  --r-chip: 3px;
+  --r-control: 4px;
+  --r-panel: 8px;
+
+  --focus-ring: 0 0 0 2px var(--iris);
+  --spine-h: 2px;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

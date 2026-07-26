@@ -11,9 +11,14 @@ import { ActivePanel } from './components/ActivePanel'
 import { AutoPanel } from './components/AutoPanel'
 import { CapturePanel } from './components/CapturePanel'
 import { EventLog } from './components/EventLog'
+import { consoleStatus } from './lib/status'
 
 export default function App() {
   const everConnected = useStore((s) => s.everConnected)
+  const conn = useStore((s) => s.conn)
+  const stalled = useStore((s) => s.stalled)
+  const capturing = useStore((s) => !!s.snapshot?.capture.running)
+  const status = consoleStatus({ conn, stalled, capturing })
 
   useEffect(() => {
     const id = setInterval(() => useStore.getState().tick(), 500)
@@ -33,7 +38,8 @@ export default function App() {
   if (!everConnected) return <ConnectScreen />
 
   return (
-    <div className="app">
+    <div className={`app is-${status.key}`}>
+      <div className="spine" />
       <SessionBar />
       <ConnectionBanner />
       <div className="main">

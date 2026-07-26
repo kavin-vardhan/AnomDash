@@ -3,6 +3,7 @@ import { useStore, useControlValue, useLive } from '../store'
 import { client } from '../transport/AnomalyClient'
 import { metres, coveragePct } from '../lib/format'
 import { throttle } from '../lib/throttle'
+import { consoleStatus } from '../lib/status'
 
 const sendPollRadius = (cm: number) => client.setPollRadius(cm)
 const sendCoverage = (pct: number) => client.setMinScreenCoverage(pct)
@@ -70,14 +71,19 @@ function ThrottledSlider({ path, prefix, className, title, min, max, step, value
 
 export function SessionBar() {
   const conn = useStore((s) => s.conn)
+  const stalled = useStore((s) => s.stalled)
+  const capturing = useStore((s) => !!s.snapshot?.capture.running)
   const session = useStore((s) => s.snapshot?.session)
   const auto = useStore((s) => s.snapshot?.auto)
   const { connected } = useLive()
+  const status = consoleStatus({ conn, stalled, capturing })
 
   return (
     <div className="session-bar">
-      <span className={`dot ${conn === 'connected' ? 'ok' : 'bad'}`} />
-      <span className="conn">{conn === 'connected' ? 'connected' : conn === 'auth_failed' ? 'token rejected' : `reconnecting (${conn})`}</span>
+      <span className={`status-chip is-${status.key}`} title={conn === 'auth_failed' ? 'token rejected by server' : conn}>
+        <span className={`status-dot${status.pulses ? ' pulsing' : ''}`} />
+        <span className="status-word">{status.word}</span>
+      </span>
       <span className="sep" />
       <span>FPS <b>{session ? Math.round(session.fps) : '—'}</b></span>
       <span>seed <b>{auto ? auto.seed : '—'}</b></span>
