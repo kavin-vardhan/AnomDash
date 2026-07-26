@@ -38,9 +38,9 @@ button {
   font-family: var(--font-sans); font-size: var(--fs-body); font-weight: var(--fw-medium);
 }
 button:hover:not(:disabled) { background: var(--iris-light); }
-button:disabled { background: var(--raised); color: var(--faint); cursor: not-allowed; }
 button.danger { background: var(--offline); color: var(--iris-ink); }
 button.danger:hover:not(:disabled) { filter: brightness(1.1); }
+button:disabled, button.danger:disabled { background: var(--raised); color: var(--faint); cursor: not-allowed; }
 
 input, select {
   background: var(--void); border: 1px solid var(--line); color: var(--text);
