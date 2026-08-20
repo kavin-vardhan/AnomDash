@@ -7,7 +7,7 @@ const PENDING_BACKSTOP_MS = 10000
 const ACTIVE_TTL = 3000
 const STALL_MS = 2000
 
-export const HIDDEN_ANOMALY_IDS = new Set(['lod_corruption', 'lod_popping', 'time_dilation', 'lighting_mismatch'])
+export const HIDDEN_ANOMALY_IDS = new Set(['lod_corruption', 'time_dilation', 'lighting_mismatch'])
 
 function resolvePath(obj: unknown, path: string): unknown {
   return path.split('.').reduce<unknown>((o, k) => (o == null ? undefined : (o as Record<string, unknown>)[k]), obj)
