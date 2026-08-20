@@ -18,6 +18,7 @@ export function CapturePanel() {
 
   const [dir, setDir] = useState(capturesRoot())
   const [format, setFormat] = useState<'png' | 'jpeg'>('png')
+  const [outputHeight, setOutputHeight] = useState('')
   const [seed, setSeed] = useState('')
   const [frames, setFrames] = useState('120')
   const [anomalyId, setAnomalyId] = useState('')
@@ -40,6 +41,7 @@ export function CapturePanel() {
 
   const start = () => {
     const opts: Record<string, unknown> = { format }
+    if (outputHeight !== '') opts.outputHeight = Number(outputHeight)
     if (dir.trim()) opts.dir = dir.trim()
     if (seed.trim() && !Number.isNaN(Number(seed))) opts.seed = Number(seed)
     if (framesValid) opts.maxFrames = Math.floor(framesNum)
@@ -100,6 +102,19 @@ export function CapturePanel() {
               <select value={format} onChange={(e) => setFormat(e.target.value as 'png' | 'jpeg')}>
                 <option value="png">PNG (lossless)</option>
                 <option value="jpeg">JPEG (smaller)</option>
+              </select>
+            </label>
+            <label
+              className="inline"
+              title="Output resolution of the SAVED frames. The game still renders at full size; only the written image is resampled, so labels and anomaly selection are unaffected. Width follows the frame's own aspect. Leave on native to save exactly what is rendered."
+            >
+              size
+              <select value={outputHeight} onChange={(e) => setOutputHeight(e.target.value)}>
+                <option value="">native (as rendered)</option>
+                <option value="1080">1080p</option>
+                <option value="720">720p</option>
+                <option value="540">540p</option>
+                <option value="360">360p</option>
               </select>
             </label>
             <label className="inline">
