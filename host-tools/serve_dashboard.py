@@ -75,10 +75,19 @@ class DashboardHandler(SimpleHTTPRequestHandler):
 
 
 def main():
+    if sys.version_info < (3, 7):
+        print("ERROR: Python 3.7 or newer is required (found %d.%d)."
+              % (sys.version_info[0], sys.version_info[1]))
+        print("       This server relies on SimpleHTTPRequestHandler's 'directory' argument,")
+        print("       which was added in 3.7. Install a newer Python and re-run Setup.bat.")
+        return 3
+
     ap = argparse.ArgumentParser(description="Serve the packaged Anomaly Dashboard build.")
     ap.add_argument("--directory", required=True, help="folder containing index.html and config.json")
     ap.add_argument("--port", type=int, default=5180, help="port to serve on (default 5180)")
     ap.add_argument("--bind", default="127.0.0.1", help="address to bind (default 127.0.0.1)")
+    ap.add_argument("--verify-only", action="store_true",
+                    help="serve briefly, fetch ./config.json over HTTP, report and exit")
     args = ap.parse_args()
 
     root = os.path.abspath(args.directory)
@@ -108,6 +117,30 @@ def main():
         return 2
 
     url = "http://%s:%d/" % (args.bind, args.port)
+
+    if args.verify_only:
+        import threading
+        import urllib.request
+        import json as _json
+        t = threading.Thread(target=httpd.handle_request)
+        t.daemon = True
+        t.start()
+        try:
+            with urllib.request.urlopen(url + "config.json", timeout=5) as resp:
+                body = resp.read().decode("utf-8")
+                _json.loads(body)
+                ctype = resp.headers.get("Content-Type", "")
+        except Exception as exc:
+            print("FAIL: config.json is not fetchable from the served root - %s" % exc)
+            httpd.server_close()
+            return 4
+        httpd.server_close()
+        if "application/json" not in ctype:
+            print("FAIL: config.json served as '%s', expected application/json." % ctype)
+            return 4
+        print("OK: config.json is fetchable from %s and parses as JSON." % url)
+        return 0
+
     print("=" * 60)
     print("  Anomaly Dashboard is being served")
     print("  Open:   %s" % url)

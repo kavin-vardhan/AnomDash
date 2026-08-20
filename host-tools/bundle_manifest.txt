@@ -1,0 +1,56 @@
+# DELIVERY BUNDLE MANIFEST - THE SOURCE OF TRUTH FOR WHAT SHIPS
+#
+# make_delivery.bat reads this file and copies exactly these entries, in this order.
+# IT IS AN ALLOWLIST, NOT A COPY-EXCEPT. If a new client-facing file is added to the repo
+# and NOT added here, IT WILL NOT SHIP. That is deliberate: a blocklist silently ships
+# whatever gets added next, and this project already settled that argument once with the
+# renderable-visible predicate.
+#
+# Syntax, one entry per line:
+#   DIR   <source path relative to THIS repo>    <destination relative to bundle root>
+#   FILE  <source path relative to THIS repo>    <destination relative to bundle root>
+#   PLUGINFILE <source path relative to the PLUGIN repo> <destination>
+# Lines beginning # are comments. Blank lines ignored.
+#
+# *** PLUGINFILE IS A CROSS-REPO ENTRY. THIS BUNDLE IS NOT ASSEMBLED FROM ONE REPO. ***
+# Its source lives in the AnomalyInjector plugin repo, whose location is a --plugin-repo
+# parameter with a sensible default - never hardcoded. If a PLUGINFILE source is not
+# found the script FAILS, NAMES THE FILE AND THE PATH IT LOOKED IN, AND PRODUCES NO
+# BUNDLE. A partial bundle that reports success is the failure this whole manifest exists
+# to prevent.
+#
+# The resulting bundle layout is the one the delivery docs specify
+# (client-readme.md "The delivery folder looks like this", and client-delivery.md's
+# <delivery root>/dashboard/config.json):
+#
+#   <delivery folder>/
+#     Setup.bat            run once, first
+#     Run.bat              starts the encoder watcher and the dashboard server
+#     dashboard/           the BUILT dashboard - index.html + assets/ ; Setup.bat writes
+#                          config.json in here, because the app fetches ./config.json
+#                          RELATIVE TO THE SERVED ROOT
+#     host-tools/          the python helpers the two .bat files call
+#
+# DELIBERATELY NOT SHIPPED, and why:
+#   src-tauri/           the desktop path stays in the repo and OUT of the bundle
+#   node_modules/, src/, .git/, *.config.*  dev-only
+#   config.json          NEVER copied from the dev tree - it carries the owner's token.
+#                        Setup.bat generates it on the client machine.
+#   make_delivery.bat, make_delivery.py, bundle_manifest.txt
+#                        dev tooling. The client never sees the packaging tool.
+
+FILE  host-tools/Setup.bat                  Setup.bat
+FILE  host-tools/Run.bat                    Run.bat
+
+# CROSS-REPO. The client's own guide. It documents the WHOLE delivery - game build,
+# capture settings, console surface, dashboard, encoder - not the dashboard alone, which
+# is why it lives beside client-delivery.md in the plugin repo and is edited with it.
+PLUGINFILE  docs/client-readme.md           README.md
+
+DIR   dist                                  dashboard
+
+FILE  host-tools/encode_watcher.py          host-tools/encode_watcher.py
+FILE  host-tools/serve_dashboard.py         host-tools/serve_dashboard.py
+FILE  host-tools/selfcheck.py               host-tools/selfcheck.py
+FILE  host-tools/write_config.py            host-tools/write_config.py
+FILE  host-tools/README.md                  host-tools/README.md
