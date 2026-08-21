@@ -137,26 +137,3 @@ with the Pillow-equipped Python; leave the window open, close it when done captu
 
 Requires Python 3 (stdlib only for the watcher) and Pillow (for `verify_capture.py`). Works whether the
 capture is started from the dashboard or the in-game console — it only watches the disk.
-
-## measure_label_offset.py (dev/QA only)
-Read-only measuring instrument. For each annotated event in a finished session it measures **where the
-anomaly actually manifests in pixels** against **where `annotation.json` claims it is**, and prints a
-per-anomaly-type offset table plus a per-event CSV. It answers one question: how many frames separate the
-annotation from the pixels?
-
-    python host-tools\measure_label_offset.py <session_dir> [<session_dir> ...]
-    python host-tools\measure_label_offset.py <root_dir_containing_sessions>
-    python host-tools\measure_label_offset.py A B --label editor-sve --label packaged-sve
-    python host-tools\measure_label_offset.py <session_dir> --log "<UE .log>" --verbose --series
-
-Python 3 + Pillow, nothing else. It never writes into a session directory; the CSV goes to `--csv`
-(default `./measure_label_offset.csv`). Both conventions it depends on are printed in its own output
-header, so a screen photo of a result carries them: **the PNG filename index IS the session index and it
-is 0-BASED**, and **offset = manifested − annotated, positive = pixels lag the label**.
-
-It reports UNMEASURABLE rather than guessing when ambient change swamps the signal, and raises a
-`*** BASELINE CONTAMINATED ***` banner when a reference frame is itself manifesting — the condition under
-which an offset larger than the clean gap between bursts would otherwise be silently under-read. With
-`--log` it also parses the `m31` `SVE-WANT-TRACE` / `SVE-WANT-SUMMARY` handshake tokens and reports the
-arm→publish gap distribution, refusing the join outright if the log's run start time does not match the
-session's `run.json`. Full method, constants and limits are in the script's own module docstring.
