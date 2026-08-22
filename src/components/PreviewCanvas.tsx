@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import { useStore } from '../store'
 import { isNearFullscreen, pickActorAt, rectArea } from '../lib/geom'
+import { displayName } from '../types'
 
 const FALLBACK_W = 960
 const FALLBACK_H = 540
@@ -130,7 +131,7 @@ export function PreviewCanvas() {
       if (overlay.labels && !near && (isSel || isActive || rectArea(v.rect) < 0.15)) {
         const fs = 11 * scale
         ctx.font = `${fs}px 'IBM Plex Mono', ui-monospace, monospace`
-        const label = v.name
+        const label = displayName(v)
         const tw = ctx.measureText(label).width
         const boxH = 13 * scale
         ctx.fillStyle = 'rgba(10,13,20,0.7)'

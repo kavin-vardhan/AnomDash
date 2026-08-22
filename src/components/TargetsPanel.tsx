@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../store'
+import { displayName } from '../types'
 
 export function TargetsPanel() {
   const visible = useStore((s) => s.snapshot?.visible ?? [])
@@ -9,22 +10,30 @@ export function TargetsPanel() {
 
   const f = filter.trim().toLowerCase()
   const rows = f
-    ? visible.filter((v) => v.name.toLowerCase().includes(f) || v.class.toLowerCase().includes(f))
+    ? visible.filter(
+        (v) =>
+          v.name.toLowerCase().includes(f) ||
+          v.class.toLowerCase().includes(f) ||
+          (v.asset ?? '').toLowerCase().includes(f),
+      )
     : visible
 
   return (
     <div className="panel targets">
       <h3>Objects on screen ({visible.length})</h3>
-      <input className="filter" placeholder="filter by name / type…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+      <input className="filter" placeholder="filter by asset / name / type…" value={filter} onChange={(e) => setFilter(e.target.value)} />
       <div className="list">
         {rows.map((v) => (
           <div
             key={v.name}
             className={`row ${v.name === selected ? 'sel' : ''}`}
             onClick={() => selectActor(v.name === selected ? null : v.name)}
-            title={v.class}
+            title={`${v.name}\n${v.compClass || v.class}`}
           >
-            <span className="nm">{v.name}</span>
+            <span className="nm">
+              {displayName(v)}
+              {v.asset ? <span className="sub"> · {v.name}</span> : null}
+            </span>
             <span className="meta">{v.comp} · {Math.round(v.dist)}u</span>
           </div>
         ))}

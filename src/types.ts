@@ -11,9 +11,15 @@ export interface VisibleActor {
   name: string
   class: string
   comp: string
+  asset?: string
+  compClass?: string
   dist: number
   rect: number[]
   rectValid: boolean
+}
+
+export function displayName(v: VisibleActor): string {
+  return v.asset && v.asset.length > 0 ? v.asset : v.name
 }
 
 export interface ActiveAnomaly {
