@@ -3,6 +3,7 @@ import { useStore, useControlValue, useLive } from '../store'
 import { client } from '../transport/AnomalyClient'
 import { basename } from '../lib/format'
 import { capturesRoot } from '../config'
+import { isTargetable } from '../types'
 
 export function CapturePanel() {
   const cap = useStore((s) => s.snapshot?.capture)
@@ -26,7 +27,7 @@ export function CapturePanel() {
   const running = useControlValue<boolean>('capture.running', cap?.running ?? false)
   const { live, connected } = useLive()
 
-  const objectAnomalies = useMemo(() => catalog.filter((e) => e.scope === 'object'), [catalog])
+  const objectAnomalies = useMemo(() => catalog.filter(isTargetable), [catalog])
 
   useEffect(() => {
     if (!anomalyId && objectAnomalies.length) setAnomalyId(objectAnomalies[0].id)

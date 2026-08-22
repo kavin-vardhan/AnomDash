@@ -98,7 +98,12 @@ export interface CatalogEntry {
   description: string
   usage: string
   scope: 'object' | 'component' | 'global'
+  targetable?: boolean
   args: ArgSpec[]
+}
+
+export function isTargetable(e: CatalogEntry): boolean {
+  return e.targetable ?? e.scope === 'object'
 }
 
 export interface FrameData {
