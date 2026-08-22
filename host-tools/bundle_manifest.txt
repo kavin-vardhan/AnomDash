@@ -12,12 +12,18 @@
 #   PLUGINFILE <source path relative to the PLUGIN repo> <destination>
 # Lines beginning # are comments. Blank lines ignored.
 #
-# *** PLUGINFILE IS A CROSS-REPO ENTRY. THIS BUNDLE IS NOT ASSEMBLED FROM ONE REPO. ***
-# Its source lives in the AnomalyInjector plugin repo, whose location is a --plugin-repo
-# parameter with a sensible default - never hardcoded. If a PLUGINFILE source is not
-# found the script FAILS, NAMES THE FILE AND THE PATH IT LOOKED IN, AND PRODUCES NO
-# BUNDLE. A partial bundle that reports success is the failure this whole manifest exists
-# to prevent.
+# *** PLUGINFILE IS A CROSS-REPO ENTRY, AND IT IS OPT-IN. ***
+# Its source lives in the AnomalyInjector plugin repo, which is NOT present on every
+# machine that packages a bundle. There is NO derived default path: assuming the two trees
+# sit side by side is exactly what broke packaging once.
+#   --plugin-repo NOT given -> PLUGINFILE entries are SKIPPED, the bundle is built from
+#                              this repo alone and exits 0, and a closing notice names the
+#                              omitted files and where they go. The owner adds them by hand.
+#   --plugin-repo GIVEN     -> they are resolved, and a missing one FAILS, NAMES THE FILE
+#                              AND THE PATH IT LOOKED IN, AND PRODUCES NO BUNDLE.
+# FILE and DIR entries come from THIS repo and are unconditional: a missing one still fails
+# the run outright. A partial bundle that reports success is the failure this whole manifest
+# exists to prevent - which is why the dashboard-only run says so in its own success line.
 #
 # The resulting bundle layout is the one the delivery docs specify
 # (client-readme.md "The delivery folder looks like this", and client-delivery.md's

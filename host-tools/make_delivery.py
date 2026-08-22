@@ -18,6 +18,17 @@ whether or not anything is wrong.
 
 It does not run npm run build. A packaging script that builds is one that can fail halfway
 and leave a half-built dist.
+
+CROSS-REPO FILES ARE OPT-IN. PLUGINFILE entries come from the AnomalyInjector repo, which is
+NOT present on every machine that packages a bundle - deriving its path from this repo's
+location assumed the two trees sit side by side, and on the packaging machine they do not.
+So: with no --plugin-repo, those entries are SKIPPED, the bundle is built from this repo
+alone, the run exits 0, and a closing notice names exactly which files are missing and where
+they go. With --plugin-repo, they are resolved and a missing one FAILS LOUDLY - an explicit
+request that cannot be satisfied is still an error.
+
+Everything sourced from THIS repo keeps the original fail-loudly behaviour. Only the
+cross-repo class became optional.
 """
 
 import argparse
@@ -28,8 +39,6 @@ from datetime import datetime
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 MANIFEST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bundle_manifest.txt")
-DEFAULT_PLUGIN_REPO = os.path.abspath(
-    os.path.join(REPO, "..", "StackOBot", "Plugins", "AnomalyInjector"))
 
 
 def read_manifest(path):
@@ -103,23 +112,42 @@ def main():
     ap = argparse.ArgumentParser(description="Assemble a client delivery bundle.")
     ap.add_argument("--dest", required=True, help="destination folder for the bundle")
     ap.add_argument("--yes", action="store_true", help="skip the stale-build confirmation")
-    ap.add_argument("--plugin-repo", default=DEFAULT_PLUGIN_REPO,
-                    help="AnomalyInjector repo root, source of PLUGINFILE entries")
+    ap.add_argument("--plugin-repo", default=None,
+                    help="OPTIONAL. AnomalyInjector repo root, source of PLUGINFILE entries. "
+                         "Omit it on a machine that has only the dashboard repo: the bundle is "
+                         "built from this repo alone and the cross-repo files are listed as not "
+                         "included. Give it and every PLUGINFILE must resolve or the run fails.")
     args = ap.parse_args()
 
     dest = os.path.abspath(args.dest)
-    plugin_repo = os.path.abspath(args.plugin_repo)
+    plugin_repo = os.path.abspath(args.plugin_repo) if args.plugin_repo else None
     print("=" * 62)
     print("  Anomaly delivery bundle")
     print("=" * 62)
     print("  repo   : %s" % REPO)
-    print("  plugin : %s" % plugin_repo)
+    if plugin_repo:
+        print("  plugin : %s  (--plugin-repo given; cross-repo files WILL be included)" % plugin_repo)
+    else:
+        print("  plugin : (not given - cross-repo files will NOT be included; see the notice at the end)")
     print("  dest   : %s" % dest)
     print("")
 
     entries = read_manifest(MANIFEST)
     if entries is None:
         return 1
+
+    if plugin_repo and not os.path.isdir(plugin_repo):
+        print("FAILED: --plugin-repo was given but that directory does not exist.")
+        print("  %s" % plugin_repo)
+        print("")
+        print("  Passing --plugin-repo is an explicit request to include the cross-repo files,")
+        print("  so a path that is not there is an error, not something to work around. Either")
+        print("  correct the path, or omit --plugin-repo entirely to build a dashboard-only")
+        print("  bundle and add those files by hand.")
+        return 2
+
+    omitted = [e for e in entries if e[0] == "PLUGINFILE"] if not plugin_repo else []
+    included = [e for e in entries if e[0] != "PLUGINFILE"] if not plugin_repo else entries
 
     if os.path.exists(dest) and os.listdir(dest):
         print("STOPPING: destination is not empty.")
@@ -133,10 +161,14 @@ def main():
         return 1
 
     print("")
-    print("  copying %d manifest entries..." % len(entries))
+    if omitted:
+        print("  copying %d of %d manifest entries (%d cross-repo entries skipped - no --plugin-repo)..."
+              % (len(included), len(entries), len(omitted)))
+    else:
+        print("  copying %d manifest entries..." % len(included))
     os.makedirs(dest, exist_ok=True)
     missing_sources = []
-    for kind, rel_src, rel_dst in entries:
+    for kind, rel_src, rel_dst in included:
         base_repo = plugin_repo if kind == "PLUGINFILE" else REPO
         s = os.path.join(base_repo, rel_src.replace("/", os.sep))
         d = os.path.join(dest, rel_dst.replace("/", os.sep))
@@ -171,9 +203,9 @@ def main():
         return 2
 
     print("")
-    print("  verifying every manifest entry arrived...")
+    print("  verifying every INCLUDED manifest entry arrived...")
     ok = True
-    for kind, rel_src, rel_dst in entries:
+    for kind, rel_src, rel_dst in included:
         d = os.path.join(dest, rel_dst.replace("/", os.sep))
         present = os.path.isdir(d) if kind == "DIR" else os.path.isfile(d)
         print("    %-11s %-40s %s" % (kind, rel_dst, "present" if present else "*** MISSING ***"))
@@ -196,7 +228,16 @@ def main():
 
     print("")
     print("=" * 62)
-    print("  BUNDLE COMPLETE")
+    if omitted:
+        print("  BUNDLE BUILT - DASHBOARD-ONLY, NOT COMPLETE")
+        print("  entries: %d/%d manifest entries present (dashboard-only; %d plugin-side"
+              % (len(included), len(entries), len(omitted)))
+        print("           file(s) NOT included - see the notice below)")
+    else:
+        print("  BUNDLE COMPLETE")
+        print("  entries: %d/%d manifest entries present (including %d cross-repo file(s))"
+              % (len(entries), len(entries),
+                 sum(1 for k, _s, _d in entries if k == "PLUGINFILE")))
     print("  files  : %d" % total_files)
     print("  size   : %.1f MB" % (total_bytes / 1048576.0))
     print("  dest   : %s" % dest)
@@ -204,6 +245,29 @@ def main():
     print("  config.json was NOT copied - it carries your token. Setup.bat writes it on")
     print("  the client machine, into dashboard\\ where the app fetches it from.")
     print("=" * 62)
+
+    if omitted:
+        print("")
+        print("!" * 62)
+        print("  ACTION REQUIRED BEFORE YOU DELIVER THIS FOLDER")
+        print("!" * 62)
+        print("")
+        print("  This bundle was built WITHOUT a plugin repo, so these file(s) are NOT in it.")
+        print("  You must copy them in by hand before delivering:")
+        print("")
+        for _kind, rel_src, rel_dst in omitted:
+            print("      %-24s ->  %s" % (os.path.basename(rel_src), os.path.join(dest, rel_dst.replace("/", os.sep))))
+        print("")
+        print("  Take them from the AnomalyInjector plugin repo:")
+        for _kind, rel_src, rel_dst in omitted:
+            print("      %-24s is at  <AnomalyInjector>/%s" % (os.path.basename(rel_src), rel_src))
+        print("")
+        print("  Until they are in place the client has no guide and no overlay inspector.")
+        print("  Nothing here invented a placeholder for them, and nothing will.")
+        print("")
+        print("  On a machine that HAS both trees you can avoid this step entirely:")
+        print("      make_delivery.py --dest <folder> --plugin-repo <AnomalyInjector repo>")
+        print("!" * 62)
     return 0
 
 
