@@ -50,6 +50,15 @@ PLUGINFILE  docs/client-readme.md           README.md
 DIR   dist                                  dashboard
 
 FILE  host-tools/encode_watcher.py          host-tools/encode_watcher.py
+FILE  host-tools/overlay_watcher.py         host-tools/overlay_watcher.py
+
+# CROSS-REPO. The overlay INSPECTION tool the watcher above calls. It draws the capture's own boxes
+# onto COPIES of the frames so a human can confirm an anomaly that is hard to see by eye. It is NOT a
+# label producer - engine-side labels stay authoritative and it never edits a frame or a label file.
+# It lives in the plugin repo's tools/ because it is also an internal diagnostic, and it ships FROM
+# THERE rather than being duplicated - a second copy is a second thing to drift.
+PLUGINFILE  tools/verify_capture.py         host-tools/verify_capture.py
+
 FILE  host-tools/serve_dashboard.py         host-tools/serve_dashboard.py
 FILE  host-tools/selfcheck.py               host-tools/selfcheck.py
 FILE  host-tools/write_config.py            host-tools/write_config.py

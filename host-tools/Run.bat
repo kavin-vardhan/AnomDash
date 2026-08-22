@@ -36,9 +36,10 @@ if not exist "%PY%" (
 
 set "HEARTBEAT=%~dp0.watcher_alive"
 
-echo Launching the encoder watcher and the dashboard server...
-echo Close both windows to stop.
+echo Launching the encoder watcher, the overlay inspector and the dashboard server...
+echo Close all three windows to stop.
 start "Anomaly Watcher" cmd /k ""%PY%" "%~dp0host-tools\encode_watcher.py" --ffmpeg "%FFMPEG%" --root "%CAPTURES_ROOT%" --heartbeat "%HEARTBEAT%""
+start "Anomaly Overlay Inspector" cmd /k ""%PY%" "%~dp0host-tools\overlay_watcher.py" --root "%CAPTURES_ROOT%" --script "%~dp0host-tools\verify_capture.py""
 start "Anomaly Dashboard Server" cmd /k ""%PY%" "%~dp0host-tools\serve_dashboard.py" --directory "%SERVEDIR%" --port %PORT%"
 
 ping -n 4 127.0.0.1 >nul 2>&1
@@ -49,7 +50,7 @@ ping -n 3 127.0.0.1 >nul 2>&1
 "%PY%" "%~dp0host-tools\selfcheck.py" --dashboard-port %PORT% --heartbeat "%HEARTBEAT%"
 
 echo.
-echo The dashboard is at %URL% - leave the two windows open while you capture.
+echo The dashboard is at %URL% - leave the three windows open while you capture.
 echo This window can be closed.
 pause
 endlocal
