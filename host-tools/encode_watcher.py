@@ -16,6 +16,17 @@ How it works:
   - For each completed session not yet encoded, runs ffmpeg to write Video_Clip/<session>.mp4 at the
     annotation's video.fps (default 30). Frame numbering is session-local 0-based (frame_%05d) so the
     ffmpeg image2 demuxer globs them directly.
+  - Timebase cross-check (m33): when the session carries labels.jsonl, the wall rate is measured from
+    the per-row t_wall stamps (keyed by session_index, matched to the frame files actually present;
+    never keyed positionally and never by frame_index). The estimator is 1/median(consecutive t_wall
+    delta) over the matched rows - NOT (N-1)/span, because the deliberate settle gaps between bursts
+    are real wall time that is deliberately uncaptured, so a span-based rate under-reads every healthy
+    gapped session by ~25% (measured on a certified-healthy banked session: 22.99 vs 30); the median
+    sits inside the bursts and ignores the gap outliers. If the measured wall fps agrees with the
+    annotation's video.fps within 2 percent, the annotation wins silently, exactly as before. If they
+    disagree, the session encodes at the MEASURED wall rate and one loud line names both numbers and
+    which won. No labels.jsonl / unparseable rows / fewer than 2 matched rows -> the annotation fps is
+    used as before, with a note line saying the cross-check was unavailable.
   - De-dups via a .mp4_done marker written into the session dir (survives restarts). On startup it backfills
     any completed session without that marker, then keeps watching.
   - Fail-soft: if ffmpeg is missing or errors, it LOGS and keeps watching - never crashes. A session that
@@ -50,6 +61,8 @@ MARKER = ".mp4_done"
 DONE_SIGNAL = "run_summary.json"
 ANNOTATION = "annotation.json"
 FRAMES_SUBDIR = "Actual_Frames"
+LABELS = "labels.jsonl"
+TIMEBASE_TOLERANCE = 0.02
 
 
 def log(msg):
@@ -75,6 +88,50 @@ def detect_frame_ext(frames_dir):
             return ext
     hits = sorted(glob.glob(os.path.join(frames_dir, "frame_*.*")))
     return os.path.splitext(hits[0])[1].lstrip(".").lower() if hits else None
+
+
+def measured_wall_fps(session_dir, frames_dir, ext):
+    """Measure the session's true wall rate from labels.jsonl t_wall stamps.
+
+    Rows are keyed by session_index (the frame filename index) and matched against the frame files
+    actually on disk; rows without a matching file are ignored. Returns (fps, matched_count) on
+    success, or (None, reason) when the cross-check is unavailable - absent file, unparseable rows,
+    fewer than 2 matched rows, or a non-positive t_wall span.
+    """
+    labels_path = os.path.join(session_dir, LABELS)
+    if not os.path.isfile(labels_path):
+        return None, f"no {LABELS}"
+    rows = {}
+    try:
+        with open(labels_path, "r", encoding="utf-8") as lf:
+            for line in lf:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except ValueError:
+                    continue
+                idx = rec.get("session_index")
+                t_wall = rec.get("t_wall")
+                if isinstance(idx, int) and isinstance(t_wall, (int, float)):
+                    rows[idx] = float(t_wall)
+    except OSError as e:
+        return None, f"could not read {LABELS}: {e}"
+    if not rows:
+        return None, f"{LABELS} carries no usable session_index/t_wall rows"
+    matched = sorted(
+        idx for idx in rows
+        if os.path.isfile(os.path.join(frames_dir, f"frame_{idx:05d}.{ext}"))
+    )
+    if len(matched) < 2:
+        return None, f"only {len(matched)} row(s) match a frame file"
+    deltas = sorted(d for d in (rows[b] - rows[a] for a, b in zip(matched, matched[1:])) if d > 0)
+    if not deltas:
+        return None, "no positive t_wall deltas"
+    mid = len(deltas) // 2
+    median = deltas[mid] if len(deltas) % 2 else 0.5 * (deltas[mid - 1] + deltas[mid])
+    return 1.0 / median, len(matched)
 
 
 def encode_session(session_dir, ffmpeg):
@@ -106,6 +163,15 @@ def encode_session(session_dir, ffmpeg):
     if not ext:
         log(f"skip {name}: no frames in {frames_rel}/")
         return False
+
+    fps_annotation = fps
+    fps_measured, detail = measured_wall_fps(session_dir, frames_dir, ext)
+    if fps_measured is None:
+        log(f"note {name}: timebase cross-check unavailable ({detail}); encoding at annotation fps={fps_annotation}")
+    elif abs(fps_measured - fps_annotation) > TIMEBASE_TOLERANCE * fps_annotation:
+        fps = round(fps_measured, 3)
+        log(f"TIMEBASE MISMATCH {name}: annotation fps={fps_annotation} vs measured wall fps={fps_measured:.3f} "
+            f"over {detail} frames -> encoding at {fps} (wall-true)")
 
     out_path = os.path.join(session_dir, os.path.normpath(video_rel))
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
