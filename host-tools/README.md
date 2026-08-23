@@ -125,7 +125,9 @@ valid.
 
 ## overlay_watcher.py (dev/QA only)
 Watches the capture output directory and auto-runs the labeling track's `verify_capture.py` to draw the
-labeled bounding boxes onto each completed capture run's frames (into `<run>/annotated/`). It triggers on
+labeled bounding boxes onto each completed capture run's frames (into `<run>/annotated/`). It writes an
+image ONLY for frames carrying at least one box, so `annotated/` is a sparse, non-contiguous sequence —
+filenames keep the original 0-based frame index and the gaps are frames with nothing to draw. It triggers on
 `run_summary.json` (run complete), de-dups via a `.overlay_done` marker, backfills existing runs on startup,
 and is fail-soft (logs and keeps watching if anything errors). This is a **dev/QA tool** (needs
 `labels.jsonl`, which delivery-mode sessions omit) and is **not** part of the client entrypoint set.

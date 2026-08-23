@@ -10,6 +10,11 @@ WHAT IT IS NOT. It is not a label producer. The engine-side labels are authorita
 what was written and draws it. It never modifies a captured frame and never edits a label file - every
 annotated image is a new file under <run>/annotated/.
 
+An image is written ONLY for frames that carry at least one box, so <run>/annotated/ is a SPARSE,
+NON-CONTIGUOUS sequence - the gaps are frames with no anomaly on them, not missing data. Filenames
+keep the original 0-based frame index. The per-run summary below always states how many frames had
+boxes, how many images were written, and out of how many total frames.
+
 RED means the event is in annotation.json for that frame: a shipped label.
 AMBER means the box is in labels.jsonl but not in annotation.json for that frame - a candidate that did
 not become a shipped label, tagged with why (see verify_capture.py's header for the categories).
@@ -103,7 +108,8 @@ def overlay_run(run_dir, script):
     for line in summary_lines:
         stripped = line.strip()
         if stripped.startswith(("RED", "AMBER", "NOTE:")) or "box(es) drawn" in stripped \
-                or "had no image" in stripped:
+                or "had boxes" in stripped or "had no image" in stripped \
+                or "had nothing to draw" in stripped:
             log(f"    {stripped}")
 
     ann_dir = os.path.join(run_dir, "annotated")
@@ -113,7 +119,8 @@ def overlay_run(run_dir, script):
             json.dump({"overlaid_at": time.strftime("%Y-%m-%d %H:%M:%S"), "annotated_images": n}, mf)
     except OSError as e:
         log(f"WARN: could not write {MARKER} in {name}: {e}")
-    log(f"done {name} -> {n} annotated image(s) in {os.path.join(run_dir, 'annotated')}")
+    log(f"done {name} -> {n} annotated image(s) (frames carrying boxes; frames with nothing to draw "
+        f"are skipped) in {os.path.join(run_dir, 'annotated')}")
     return True
 
 
