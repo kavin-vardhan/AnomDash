@@ -17,16 +17,18 @@ How it works:
     annotation's video.fps (default 30). Frame numbering is session-local 0-based (frame_%05d) so the
     ffmpeg image2 demuxer globs them directly.
   - Timebase cross-check (m33): when the session carries labels.jsonl, the wall rate is measured from
-    the per-row t_wall stamps (keyed by session_index, matched to the frame files actually present;
-    never keyed positionally and never by frame_index). The estimator is 1/median(consecutive t_wall
-    delta) over the matched rows - NOT (N-1)/span, because the deliberate settle gaps between bursts
-    are real wall time that is deliberately uncaptured, so a span-based rate under-reads every healthy
-    gapped session by ~25% (measured on a certified-healthy banked session: 22.99 vs 30); the median
-    sits inside the bursts and ignores the gap outliers. If the measured wall fps agrees with the
-    annotation's video.fps within 2 percent, the annotation wins silently, exactly as before. If they
-    disagree, the session encodes at the MEASURED wall rate and one loud line names both numbers and
-    which won. No labels.jsonl / unparseable rows / fewer than 2 matched rows -> the annotation fps is
-    used as before, with a note line saying the cross-check was unavailable.
+    the per-row stamps (keyed by session_index, matched to the frame files actually present; never
+    keyed positionally and never by frame_index). See measured_wall_fps for the estimator and why it
+    filters on GAME-time deltas rather than using a span or a median.
+  - Arbitration (m33 AMENDMENT 2). Within 2 percent of the annotation's video.fps: the annotation
+    wins silently, as before. Outside it, the winner depends on whether the stamp can be trusted:
+    a session whose run_summary carries game_clock_speed_ratio was produced by an m33+ build, whose
+    fps stamp is measured against a plugin-owned tick span and has been gated end to end - such a
+    stamp is NEVER overridden, and the disagreement is reported as a note so the capture gets
+    investigated instead of the video getting silently re-timed. A pre-m33 session keeps the
+    override, which is the only regime this cross-check was ever built for (a stamp that could be
+    blind). No labels.jsonl / unparseable rows / fewer than 2 matched rows -> annotation fps, with a
+    note. Every outcome, including the silent one, is recorded in .mp4_done.
   - De-dups via a .mp4_done marker written into the session dir (survives restarts). On startup it backfills
     any completed session without that marker, then keeps watching.
   - Fail-soft: if ffmpeg is missing or errors, it LOGS and keeps watching - never crashes. A session that
@@ -90,13 +92,41 @@ def detect_frame_ext(frames_dir):
     return os.path.splitext(hits[0])[1].lstrip(".").lower() if hits else None
 
 
+def has_honest_stamp(session_dir):
+    """True when run_summary carries m33+ telemetry, i.e. the engine's fps stamp has been gated.
+
+    game_clock_speed_ratio only exists from m33 onward, and its presence is what distinguishes a
+    stamp measured against a plugin-owned tick span (trustworthy) from a pre-m33 stamp that could
+    be blind on a host whose game clock tracks wall.
+    """
+    try:
+        with open(os.path.join(session_dir, DONE_SIGNAL), "r", encoding="utf-8") as rf:
+            rs = json.load(rf)
+    except (OSError, ValueError):
+        return False
+    return isinstance(rs, dict) and "game_clock_speed_ratio" in rs
+
+
 def measured_wall_fps(session_dir, frames_dir, ext):
-    """Measure the session's true wall rate from labels.jsonl t_wall stamps.
+    """Measure the session's true wall rate from labels.jsonl.
 
     Rows are keyed by session_index (the frame filename index) and matched against the frame files
-    actually on disk; rows without a matching file are ignored. Returns (fps, matched_count) on
-    success, or (None, reason) when the cross-check is unavailable - absent file, unparseable rows,
-    fewer than 2 matched rows, or a non-positive t_wall span.
+    actually on disk; rows without a matching file are ignored.
+
+    ESTIMATOR: the mean over intervals whose GAME-time delta (labels' own t) is a SINGLE ENGINE
+    TICK. The capture writes a contiguous session_index while skipping settle/gap ticks, so
+    consecutive frames are not uniformly spaced in time and session_index contiguity says nothing
+    about time contiguity - measured on four banked sessions, the game-delta histogram is 74
+    one-tick intervals to 15 three-tick intervals on every one of them, healthy or starved. A span
+    or all-interval mean therefore under-reads by 23-25 percent, and a median is gap-immune but
+    SPIKE-blind, which is the production shape (starvation concentrated on the minority of armed
+    frames). Filtering to single-tick intervals is gap-immune from the artifact's own evidence and
+    stays spike-sensitive because it is a mean. The tick period is derived from the data (the
+    smallest positive game delta), not from a config field. Falls back to the median rule when t is
+    unusable.
+
+    Returns (fps, info) on success where info names the estimator and the matched count, or
+    (None, reason) when the cross-check is unavailable.
     """
     labels_path = os.path.join(session_dir, LABELS)
     if not os.path.isfile(labels_path):
@@ -114,8 +144,9 @@ def measured_wall_fps(session_dir, frames_dir, ext):
                     continue
                 idx = rec.get("session_index")
                 t_wall = rec.get("t_wall")
+                t_game = rec.get("t")
                 if isinstance(idx, int) and isinstance(t_wall, (int, float)):
-                    rows[idx] = float(t_wall)
+                    rows[idx] = (float(t_wall), float(t_game) if isinstance(t_game, (int, float)) else None)
     except OSError as e:
         return None, f"could not read {LABELS}: {e}"
     if not rows:
@@ -126,12 +157,37 @@ def measured_wall_fps(session_dir, frames_dir, ext):
     )
     if len(matched) < 2:
         return None, f"only {len(matched)} row(s) match a frame file"
-    deltas = sorted(d for d in (rows[b] - rows[a] for a, b in zip(matched, matched[1:])) if d > 0)
-    if not deltas:
+
+    pairs = []
+    for a, b in zip(matched, matched[1:]):
+        dw = rows[b][0] - rows[a][0]
+        dg = None
+        if rows[a][1] is not None and rows[b][1] is not None:
+            dg = rows[b][1] - rows[a][1]
+        if dw > 0:
+            pairs.append((dw, dg))
+    if not pairs:
         return None, "no positive t_wall deltas"
+
+    game_deltas = [dg for _, dg in pairs if dg is not None and dg > 0]
+    if game_deltas:
+        tick = min(game_deltas)
+        in_burst = [dw for dw, dg in pairs if dg is not None and dg <= 1.5 * tick]
+        if len(in_burst) >= 2:
+            return len(in_burst) / sum(in_burst), {
+                "estimator": "in-burst",
+                "frames": len(matched),
+                "intervals": len(in_burst),
+            }
+
+    deltas = sorted(dw for dw, _ in pairs)
     mid = len(deltas) // 2
     median = deltas[mid] if len(deltas) % 2 else 0.5 * (deltas[mid - 1] + deltas[mid])
-    return 1.0 / median, len(matched)
+    return 1.0 / median, {
+        "estimator": "median(no-game-time)",
+        "frames": len(matched),
+        "intervals": len(deltas),
+    }
 
 
 def encode_session(session_dir, ffmpeg):
@@ -166,12 +222,28 @@ def encode_session(session_dir, ffmpeg):
 
     fps_annotation = fps
     fps_measured, detail = measured_wall_fps(session_dir, frames_dir, ext)
+    arbitration = {"annotation_fps": fps_annotation}
     if fps_measured is None:
+        arbitration["cross_check"] = f"unavailable ({detail})"
         log(f"note {name}: timebase cross-check unavailable ({detail}); encoding at annotation fps={fps_annotation}")
-    elif abs(fps_measured - fps_annotation) > TIMEBASE_TOLERANCE * fps_annotation:
-        fps = round(fps_measured, 3)
-        log(f"TIMEBASE MISMATCH {name}: annotation fps={fps_annotation} vs measured wall fps={fps_measured:.3f} "
-            f"over {detail} frames -> encoding at {fps} (wall-true)")
+    else:
+        arbitration["measured_fps"] = round(fps_measured, 3)
+        arbitration["estimator"] = detail["estimator"]
+        agrees = abs(fps_measured - fps_annotation) <= TIMEBASE_TOLERANCE * fps_annotation
+        if agrees:
+            arbitration["cross_check"] = "agrees"
+        elif has_honest_stamp(session_dir):
+            arbitration["cross_check"] = "disagrees; stamp wins (m33+ gated stamp)"
+            log(f"note {name}: timebase cross-check disagrees (annotation fps={fps_annotation} vs "
+                f"{detail['estimator']} measured {fps_measured:.3f} over {detail['intervals']} intervals) "
+                f"but this session carries an m33+ gated stamp, so the stamp WINS; encoding at {fps_annotation}. "
+                f"Investigate the capture, not the video.")
+        else:
+            fps = round(fps_measured, 3)
+            arbitration["cross_check"] = "disagrees; measured wins (pre-m33 stamp)"
+            log(f"TIMEBASE MISMATCH {name}: annotation fps={fps_annotation} vs {detail['estimator']} measured "
+                f"wall fps={fps_measured:.3f} over {detail['intervals']} intervals -> encoding at {fps} "
+                f"(wall-true; pre-m33 session, stamp not gated)")
 
     out_path = os.path.join(session_dir, os.path.normpath(video_rel))
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
@@ -201,7 +273,9 @@ def encode_session(session_dir, ffmpeg):
 
     try:
         with open(os.path.join(session_dir, MARKER), "w", encoding="utf-8") as mf:
-            json.dump({"encoded_at": time.strftime("%Y-%m-%d %H:%M:%S"), "mp4": video_rel, "fps": fps}, mf)
+            record = {"encoded_at": time.strftime("%Y-%m-%d %H:%M:%S"), "mp4": video_rel, "fps": fps}
+            record.update(arbitration)
+            json.dump(record, mf)
     except OSError as e:
         log(f"WARN: could not write {MARKER} in {name}: {e}")
     log(f"encoded {name} -> {video_rel}  ({fps} fps, frame_%05d.{ext})")
