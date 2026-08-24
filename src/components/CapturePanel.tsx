@@ -3,7 +3,7 @@ import { useStore, useControlValue, useLive } from '../store'
 import { client } from '../transport/AnomalyClient'
 import { basename } from '../lib/format'
 import { capturesRoot } from '../config'
-import { isTargetable } from '../types'
+import { displayName, isTargetable } from '../types'
 
 export function CapturePanel() {
   const cap = useStore((s) => s.snapshot?.capture)
@@ -85,7 +85,11 @@ export function CapturePanel() {
                 target (on-screen)
                 <select value={selected ?? ''} onChange={(e) => selectActor(e.target.value || null)}>
                   <option value="">— pick / click the preview —</option>
-                  {visible.map((v) => <option key={v.name} value={v.name}>{v.name}</option>)}
+                  {visible.map((v) => (
+                    <option key={v.name} value={v.name}>
+                      {v.asset ? `${displayName(v)} · ${v.name}` : v.name}
+                    </option>
+                  ))}
                 </select>
               </label>
             </>
