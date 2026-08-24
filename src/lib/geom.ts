@@ -14,20 +14,17 @@ export function isNearFullscreen(r: number[]): boolean {
   return rectArea(r) >= NEAR_FULLSCREEN_AREA
 }
 
-function outranks(a: VisibleActor, b: VisibleActor): boolean {
-  const aNear = isNearFullscreen(a.rect)
-  const bNear = isNearFullscreen(b.rect)
-  if (aNear !== bNear) return !aNear
-  if (a.dist !== b.dist) return a.dist < b.dist
-  return rectArea(a.rect) < rectArea(b.rect)
-}
-
 export function pickActorAt(visible: VisibleActor[], nx: number, ny: number): string | null {
   let best: VisibleActor | null = null
+  let bestArea = Infinity
   for (const v of visible) {
     if (!v.rectValid) continue
-    if (!rectContains(v.rect, nx, ny)) continue
-    if (!best || outranks(v, best)) best = v
+    const a = rectArea(v.rect)
+    if (a >= NEAR_FULLSCREEN_AREA) continue
+    if (rectContains(v.rect, nx, ny) && a < bestArea) {
+      best = v
+      bestArea = a
+    }
   }
   return best ? best.name : null
 }
