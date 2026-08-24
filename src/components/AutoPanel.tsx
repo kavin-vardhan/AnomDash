@@ -1,5 +1,6 @@
 import { useStore, useControlValue, useLive, HIDDEN_ANOMALY_IDS } from '../store'
 import { client } from '../transport/AnomalyClient'
+import { targetLabel } from '../types'
 
 function PoolCheck({ id, fallback, enabled, onToggle }: { id: string; fallback: boolean; enabled: boolean; onToggle: (id: string, on: boolean) => void }) {
   const on = useControlValue<boolean>(`auto.pool.${id}`, fallback)
@@ -13,6 +14,7 @@ function PoolCheck({ id, fallback, enabled, onToggle }: { id: string; fallback: 
 
 export function AutoPanel() {
   const auto = useStore((s) => s.snapshot?.auto)
+  const visible = useStore((s) => s.snapshot?.visible ?? [])
   const setOptimistic = useStore((s) => s.setOptimistic)
   const mode = useStore((s) => s.captureMode)
   const { live } = useLive()
@@ -44,7 +46,7 @@ export function AutoPanel() {
         {auto.liveFires.map((f) => (
           <div key={f.id} className="nf-row">
             <span className="aid">{f.id}</span>
-            <span className="atarget">{f.target}</span>
+            <span className="atarget" title={f.target}>{targetLabel(f.target, visible)}</span>
             <span className="dim">{f.secondsRemaining.toFixed(1)}s</span>
           </div>
         ))}

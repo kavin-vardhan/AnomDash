@@ -1,8 +1,10 @@
 import { useStore, useLive } from '../store'
 import { client } from '../transport/AnomalyClient'
+import { targetLabel } from '../types'
 
 export function ActivePanel() {
   const active = useStore((s) => s.snapshot?.active ?? [])
+  const visible = useStore((s) => s.snapshot?.visible ?? [])
   const liveFires = useStore((s) => s.snapshot?.auto.liveFires ?? [])
   const pendingReverts = useStore((s) => s.pendingReverts)
   const addPendingReverts = useStore((s) => s.addPendingReverts)
@@ -28,7 +30,9 @@ export function ActivePanel() {
             <div key={a.id} className="arow">
               <div className="arow-main">
                 <span className="aid">{a.id}</span>
-                <span className="atarget" title={a.args.join(' ')}>{a.target || '(global)'}</span>
+                <span className="atarget" title={[a.target, a.args.join(' ')].filter(Boolean).join(' · ')}>
+                  {targetLabel(a.target, visible) || '(global)'}
+                </span>
               </div>
               <div className="arow-meta">
                 <span className={`src ${a.source}`}>{a.source}</span>

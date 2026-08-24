@@ -22,6 +22,11 @@ export function displayName(v: VisibleActor): string {
   return v.asset && v.asset.length > 0 ? v.asset : v.name
 }
 
+export function targetLabel(target: string, visible: VisibleActor[]): string {
+  const v = target ? visible.find((a) => a.name === target) : undefined
+  return v ? displayName(v) : target
+}
+
 export interface ActiveAnomaly {
   id: string
   target: string
