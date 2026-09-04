@@ -65,6 +65,11 @@ FILE  host-tools/overlay_watcher.py         host-tools/overlay_watcher.py
 # THERE rather than being duplicated - a second copy is a second thing to drift.
 PLUGINFILE  tools/verify_capture.py         host-tools/verify_capture.py
 
+# CROSS-REPO, AND verify_capture.py IMPORTS IT. Its region/baseline/threshold code is what the
+# --label-pixel-gate reuses instead of carrying a second copy, so the gate REFUSES TO RUN when this
+# file is missing. The two ship together or the gate ships broken.
+PLUGINFILE  tools/measure_label_offset.py   host-tools/measure_label_offset.py
+
 FILE  host-tools/serve_dashboard.py         host-tools/serve_dashboard.py
 FILE  host-tools/selfcheck.py               host-tools/selfcheck.py
 FILE  host-tools/write_config.py            host-tools/write_config.py
