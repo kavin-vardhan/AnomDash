@@ -40,8 +40,12 @@
 # DELIBERATELY NOT SHIPPED, and why:
 #   src-tauri/           the desktop path stays in the repo and OUT of the bundle
 #   node_modules/, src/, .git/, *.config.*  dev-only
-#   config.json          NEVER copied from the dev tree - it carries the owner's token.
-#                        Setup.bat generates it on the client machine.
+#   config.json          NEVER shipped from the dev tree - it carries the packaging
+#                        machine's token. npm run build copies public/config.json into
+#                        dist/, so make_delivery.py REMOVES dashboard/config.json after
+#                        the DIR dist copy (G376), and writes the delivered build's token
+#                        there only when given --token-log / --token-ini. Setup.bat keeps
+#                        that token and fills in the captures folder.
 #   make_delivery.bat, make_delivery.py, bundle_manifest.txt
 #                        dev tooling. The client never sees the packaging tool.
 
@@ -69,6 +73,13 @@ PLUGINFILE  tools/verify_capture.py         host-tools/verify_capture.py
 # --label-pixel-gate reuses instead of carrying a second copy, so the gate REFUSES TO RUN when this
 # file is missing. The two ship together or the gate ships broken.
 PLUGINFILE  tools/measure_label_offset.py   host-tools/measure_label_offset.py
+
+# CROSS-REPO. The office label-sync check (087-01): reads capture sessions read-only and prints, per
+# anomaly, how many frames each label edge is off from the picture - numbers only, standard library
+# only (Pillow optional). OFFICE-CHECK.md is its one-page instruction card. Both live in the plugin
+# repo's tools/ beside verify_capture.py; a plugin ref without them fails the --plugin-repo run.
+PLUGINFILE  tools/label_sync_check.py       host-tools/label_sync_check.py
+PLUGINFILE  tools/OFFICE-CHECK.md           host-tools/OFFICE-CHECK.md
 
 FILE  host-tools/serve_dashboard.py         host-tools/serve_dashboard.py
 FILE  host-tools/selfcheck.py               host-tools/selfcheck.py

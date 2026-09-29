@@ -29,16 +29,76 @@ request that cannot be satisfied is still an error.
 
 Everything sourced from THIS repo keeps the original fail-loudly behaviour. Only the
 cross-repo class became optional.
+
+THE DASHBOARD TOKEN (G376). `npm run build` copies the gitignored public/config.json - THIS
+machine's dev config, with THIS machine's token - into dist/, and `DIR dist` then carried it
+into the bundle while the closing message said it had not been copied. The client's dashboard
+then held whatever token the packaging machine had. So now:
+  - the copied dashboard/config.json is ALWAYS removed from the bundle, and the closing message
+    says whether one was removed;
+  - --token-log <a log of the DELIVERED game build> (its "=== Control server token:" line, and
+    its "LISTENING on ws://..." line for the server URL) or --token-ini <the delivered game's
+    DefaultGame.ini> writes dashboard/config.json with the token the delivered build ENFORCES
+    (G118). An empty, short or placeholder token is refused and no bundle is produced;
+  - without either, the bundle has no token file, the closing banner says NOT COMPLETE, and the
+    run exits 4 (as does a bundle built without --plugin-repo), so make_delivery.bat cannot
+    call it ready. Check the result with the plugin repo's tools/check_delivery_bundle.py
+    --expect-token-log <the same log>. The token itself is never printed.
 """
 
 import argparse
+import json
 import os
+import re
 import shutil
 import sys
 from datetime import datetime
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 MANIFEST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bundle_manifest.txt")
+PLACEHOLDER = re.compile(r"TESTVALUE|TESTTOKEN|CHANGEME|placeholder|^TEST$", re.I)
+MIN_TOKEN = 32
+DEFAULT_SERVER_URL = "ws://127.0.0.1:8077"
+INCOMPLETE = 4
+
+
+def token_from_log(path):
+    tok, url = None, None
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            m = re.search(r"=== Control server token: (\S+) \(", line)
+            if m:
+                tok = m.group(1)
+            m = re.search(r"LISTENING on (ws://\S+) ===", line)
+            if m:
+                url = m.group(1)
+    return tok, url
+
+
+def token_from_ini(path):
+    section = None
+    with open(path, "r", encoding="utf-8-sig", errors="replace") as fh:
+        for line in fh:
+            s = line.strip()
+            m = re.match(r"^\[(.+)\]$", s)
+            if m:
+                section = m.group(1)
+                continue
+            if section == "AnomalyControlServer":
+                m = re.match(r"^Token\s*=\s*(\S+)\s*$", s)
+                if m:
+                    return m.group(1), None
+    return None, None
+
+
+def token_problem(tok):
+    if not tok:
+        return "no token found"
+    if PLACEHOLDER.search(tok):
+        return "it is a PLACEHOLDER value"
+    if len(tok) < MIN_TOKEN:
+        return "it is only %d characters (need at least %d)" % (len(tok), MIN_TOKEN)
+    return None
 
 
 def read_manifest(path):
@@ -117,6 +177,12 @@ def main():
                          "Omit it on a machine that has only the dashboard repo: the bundle is "
                          "built from this repo alone and the cross-repo files are listed as not "
                          "included. Give it and every PLUGINFILE must resolve or the run fails.")
+    tg = ap.add_mutually_exclusive_group()
+    tg.add_argument("--token-log", default=None,
+                    help="a log of the DELIVERED game build; its control-server token (and URL) is written "
+                         "into dashboard/config.json")
+    tg.add_argument("--token-ini", default=None,
+                    help="the DELIVERED game's DefaultGame.ini ([AnomalyControlServer] Token)")
     args = ap.parse_args()
 
     dest = os.path.abspath(args.dest)
@@ -135,6 +201,27 @@ def main():
     entries = read_manifest(MANIFEST)
     if entries is None:
         return 1
+
+    token, server_url, token_src = None, None, None
+    if args.token_log or args.token_ini:
+        token_src = args.token_log or args.token_ini
+        if not os.path.isfile(token_src):
+            print("FAILED: the token source does not exist: %s" % token_src)
+            print("  NO BUNDLE WAS PRODUCED.")
+            return 2
+        token, server_url = token_from_log(token_src) if args.token_log else token_from_ini(token_src)
+        problem = token_problem(token)
+        if problem:
+            print("FAILED: cannot take the dashboard token from %s: %s." % (token_src, problem))
+            print("  A bundle that ships this token cannot log in to the delivered game (the M2 shape).")
+            print("  Point --token-log at a log of the build you are actually delivering.")
+            print("  NO BUNDLE WAS PRODUCED.")
+            return 2
+        server_url = server_url or DEFAULT_SERVER_URL
+        print("  token  : %d characters from %s  (server %s)" % (len(token), os.path.basename(token_src), server_url))
+    else:
+        print("  token  : (no --token-log / --token-ini - the bundle will have NO dashboard token)")
+    print("")
 
     if plugin_repo and not os.path.isdir(plugin_repo):
         print("FAILED: --plugin-repo was given but that directory does not exist.")
@@ -216,6 +303,25 @@ def main():
         print("FAILED: the copy did not produce every entry. Do not deliver this folder.")
         return 3
 
+    dash_rel = next((d for k, s, d in entries if k == "DIR" and s == "dist"), "dashboard")
+    cfg_path = os.path.join(dest, dash_rel.replace("/", os.sep), "config.json")
+    stripped = os.path.isfile(cfg_path)
+    if stripped:
+        os.remove(cfg_path)
+    if token:
+        with open(cfg_path, "w", encoding="utf-8") as fh:
+            json.dump({"controlToken": token, "capturesRoot": "", "serverUrl": server_url}, fh, indent=2)
+            fh.write("\n")
+        try:
+            with open(cfg_path, "r", encoding="utf-8-sig") as fh:
+                back = json.load(fh)
+        except (OSError, ValueError):
+            back = {}
+        if back.get("controlToken") != token:
+            print("")
+            print("FAILED: dashboard/config.json did not read back with the delivered token. Do not deliver this folder.")
+            return 3
+
     total_files = 0
     total_bytes = 0
     for base, _dirs, files in os.walk(dest):
@@ -228,11 +334,17 @@ def main():
 
     print("")
     print("=" * 62)
+    incomplete = bool(omitted) or not token
     if omitted:
         print("  BUNDLE BUILT - DASHBOARD-ONLY, NOT COMPLETE")
         print("  entries: %d/%d manifest entries present (dashboard-only; %d plugin-side"
               % (len(included), len(entries), len(omitted)))
         print("           file(s) NOT included - see the notice below)")
+    elif not token:
+        print("  BUNDLE BUILT - NO DASHBOARD TOKEN, NOT COMPLETE")
+        print("  entries: %d/%d manifest entries present (including %d cross-repo file(s))"
+              % (len(entries), len(entries),
+                 sum(1 for k, _s, _d in entries if k == "PLUGINFILE")))
     else:
         print("  BUNDLE COMPLETE")
         print("  entries: %d/%d manifest entries present (including %d cross-repo file(s))"
@@ -242,9 +354,30 @@ def main():
     print("  size   : %.1f MB" % (total_bytes / 1048576.0))
     print("  dest   : %s" % dest)
     print("")
-    print("  config.json was NOT copied - it carries your token. Setup.bat writes it on")
-    print("  the client machine, into dashboard\\ where the app fetches it from.")
+    if stripped:
+        print("  dist\\config.json (THIS machine's dev config and token, copied there by")
+        print("  npm run build) was REMOVED from the bundle.")
+    else:
+        print("  dist\\ carried no config.json; nothing was removed.")
+    if token:
+        print("  %s\\config.json WRITTEN with the delivered build's token (%d characters," % (dash_rel, len(token)))
+        print("  read from %s), server %s." % (os.path.basename(token_src), server_url))
+        print("  Setup.bat keeps this token and only fills in the captures folder.")
+        print("  Check it: python <plugin repo>\\tools\\check_delivery_bundle.py <bundle> --expect-token-log <that log>")
+    else:
+        print("  %s\\config.json is NOT in this bundle. Setup.bat would write an EMPTY token" % dash_rel)
+        print("  and the dashboard could not log in to the game.")
     print("=" * 62)
+    if not token:
+        print("")
+        print("!" * 62)
+        print("  ACTION REQUIRED BEFORE YOU DELIVER THIS FOLDER: THE DASHBOARD TOKEN")
+        print("!" * 62)
+        print("  Re-run with the token of the build you are delivering:")
+        print("      make_delivery.py --dest <new folder> --token-log <a log of the delivered game>")
+        print("  (or --token-ini <its DefaultGame.ini>), or write it by hand:")
+        print("      python host-tools\\write_config.py --file <bundle>\\%s\\config.json --captures-root \"\" --token <token>" % dash_rel)
+        print("!" * 62)
 
     if omitted:
         print("")
@@ -268,7 +401,7 @@ def main():
         print("  On a machine that HAS both trees you can avoid this step entirely:")
         print("      make_delivery.py --dest <folder> --plugin-repo <AnomalyInjector repo>")
         print("!" * 62)
-    return 0
+    return INCOMPLETE if incomplete else 0
 
 
 if __name__ == "__main__":

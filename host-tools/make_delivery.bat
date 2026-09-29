@@ -29,15 +29,29 @@ if not defined DEST (
 )
 set "DEST=%DEST:"=%"
 
+set "PLUGINREPO="
+set /p "PLUGINREPO=AnomalyInjector plugin repo folder (Enter = none, dashboard-only bundle): "
+if defined PLUGINREPO set "PLUGINREPO=%PLUGINREPO:"=%"
+
+set "TOKENLOG="
+set /p "TOKENLOG=A log of the DELIVERED game build, for the dashboard token (Enter = none): "
+if defined TOKENLOG set "TOKENLOG=%TOKENLOG:"=%"
+
+set "ARGS=--dest "%DEST%""
+if defined PLUGINREPO set "ARGS=%ARGS% --plugin-repo "%PLUGINREPO%""
+if defined TOKENLOG set "ARGS=%ARGS% --token-log "%TOKENLOG%""
+
 echo.
-"%PY%" "%~dp0make_delivery.py" --dest "%DEST%"
+"%PY%" "%~dp0make_delivery.py" %ARGS%
 set "RC=%errorlevel%"
 
 echo.
-if not "%RC%"=="0" (
-    echo Bundle NOT created - see the message above.
+if "%RC%"=="0" (
+    echo Bundle COMPLETE. Deliver the whole folder as-is.
+) else if "%RC%"=="4" (
+    echo Bundle built but NOT COMPLETE - see ACTION REQUIRED above. Do not deliver it as-is.
 ) else (
-    echo Bundle ready. Deliver the whole folder as-is.
+    echo Bundle NOT created - see the message above.
 )
 echo.
 pause

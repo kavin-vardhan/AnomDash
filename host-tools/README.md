@@ -22,7 +22,9 @@ time, next to the `dashboard/` and `host-tools/` folders:
                           a dashboard/watcher/game-server self-check
   dashboard/           <- the BUILT dashboard: index.html + assets/, plus config.json
   config.bat           <- written by Setup.bat (machine-specific: FFMPEG, CAPTURES_ROOT, PY); gitignored
-  host-tools/          <- this folder (encode_watcher.py, serve_dashboard.py, selfcheck.py, write_config.py)
+  host-tools/          <- this folder (encode_watcher.py, serve_dashboard.py, selfcheck.py, write_config.py),
+                          plus the plugin-side verify_capture.py, measure_label_offset.py,
+                          label_sync_check.py and OFFICE-CHECK.md (the office label-sync check and its card)
 ```
 
 ⚖ **`m27` RETURNED THE CLIENT TO THE BROWSER WORKFLOW.** The Tauri desktop app is **not removed** —
@@ -48,15 +50,32 @@ screen.
 
 ## make_delivery.bat — assembling the bundle
 
-Double-click it, give it a destination, and it produces a complete client bundle. **It is a dev tool and
-never ships** (it is not in the manifest, so it cannot copy itself).
+Double-click it and give it a destination, the plugin repo folder, and **a log of the delivered game
+build** (any run of it: its `=== Control server token:` line). **It is a dev tool and never ships** (it is
+not in the manifest, so it cannot copy itself). Command line: `make_delivery.py --dest <folder>
+--plugin-repo <AnomalyInjector repo> --token-log <a log of the delivered build>` (or `--token-ini <its
+DefaultGame.ini>`).
+
+🚨 **The dashboard token comes from the DELIVERED build, never from this machine (G376).** `npm run build`
+copies the gitignored `public/config.json` — this machine's dev config and token — into `dist/`, and until
+2026-09-29 `DIR dist` carried it into the bundle while the closing message claimed *"config.json was NOT
+copied"*. The client's dashboard then held the packaging machine's token and could log in only if the
+delivered game happened to be cooked with the same one. Now the bundler **always removes** that copy and
+says so, and **writes `dashboard\config.json` from the delivered build's own log** (the token and the
+`LISTENING on ws://…` URL). An empty, short or placeholder token is **refused and no bundle is produced**.
+Without `--token-log`/`--token-ini` the bundle has no token file, its banner reads **NOT COMPLETE**, and the
+run **exits 4** — as does a bundle built without `--plugin-repo` — so `make_delivery.bat` reports
+*"NOT COMPLETE … Do not deliver it as-is"* instead of *"ready"*. The token itself is never printed.
+Check every bundle with the plugin repo's `tools\check_delivery_bundle.py <bundle> --expect-token-log <the
+same log>` before it goes out.
 
 **`bundle_manifest.txt` is the SOURCE OF TRUTH for what ships.** It is an **allowlist, not copy-except**:
 a client-facing file that is not listed **will not ship**. That is deliberate — a blocklist silently ships
 whatever gets added next. To add a file to the bundle, add a line to the manifest.
 
 Entry kinds: `FILE` and `DIR` (relative to this repo) and **`PLUGINFILE`** (relative to the *plugin* repo,
-located by `--plugin-repo`, which has a default and is never hardcoded). A missing `PLUGINFILE` **fails,
+located by `--plugin-repo`, which is opt-in and never derived: without it the cross-repo files are
+skipped and the bundle is NOT COMPLETE, exit 4). With it, a missing `PLUGINFILE` **fails,
 names the file and the path it searched, and deletes the partial bundle** — a bundle that reports success
 while incomplete is the failure the manifest exists to prevent.
 
