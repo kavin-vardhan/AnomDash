@@ -1,7 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Dashboard",
-  "version": "0.1.0",
+  "productName": "AnomalyDashboard",
+  "mainBinaryName": "AnomalyDashboard",
+  "version": "0.2.0",
   "identifier": "com.intrusiveanomalies.dashboard",
   "build": {
     "frontendDist": "../dist",
@@ -13,16 +14,21 @@
     "windows": [
       {
         "title": "Anomaly Dashboard",
-        "width": 1360,
-        "height": 860,
-        "minWidth": 1100,
-        "minHeight": 700,
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1120,
+        "minHeight": 720,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "center": true
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' ws://127.0.0.1:8077 ws://localhost:8077 ipc: http://ipc.localhost; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
+      "csp": "default-src 'self'; connect-src 'self' ws://127.0.0.1:* ws://localhost:* ipc: http://ipc.localhost; img-src 'self' data: blob: asset: http://asset.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'",
+      "assetProtocol": {
+        "enable": true,
+        "scope": []
+      }
     }
   },
   "bundle": {

@@ -16,7 +16,7 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <div className="error-screen">
         <div className="error-card">
-          <h1>Dashboard crashed</h1>
+          <h1>Something went wrong</h1>
           <p className="dim">{String(this.state.error)}</p>
           <button onClick={() => location.reload()}>Reload</button>
         </div>

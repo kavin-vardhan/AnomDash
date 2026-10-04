@@ -1,74 +1,74 @@
 :root {
-  --void: #0A0D14;
-  --panel: #121724;
-  --raised: #1A2130;
-  --line: #273043;
-  --text: #E6EAF3;
-  --iris: #828CF8;
+  --rail: #101B2C;
+  --rail-2: #172538;
+  --rail-3: #213450;
+  --rail-text: #E8EDF5;
+  --rail-dim: #93A3BA;
 
-  --dim: #8E97AC;
-  --faint: #5C6478;
-  --iris-light: #A5ADFF;
-  --iris-ink: #07090F;
+  --ground: #F2F3F6;
+  --surface: #FFFFFF;
+  --surface-2: #F7F8FA;
+  --surface-3: #EEF0F4;
+  --line: #E1E4EA;
+  --line-2: #CBD1DA;
 
-  --live: #3ECF8E;
-  --stalled: #E5A83B;
-  --offline: #F25C54;
-  --capturing: #45C4E9;
+  --text: #121A26;
+  --text-2: #475266;
+  --text-3: #687284;
 
-  --live-glow: rgba(62, 207, 142, 0.6);
-  --stalled-glow: rgba(229, 168, 59, 0.6);
-  --offline-glow: rgba(242, 92, 84, 0.6);
-  --capturing-glow: rgba(69, 196, 233, 0.6);
+  --accent: #4B4FE0;
+  --accent-hover: #3D40C9;
+  --accent-soft: #ECEDFD;
+  --accent-ink: #2E31A8;
 
-  --live-tint: rgba(62, 207, 142, 0.1);
-  --stalled-tint: rgba(229, 168, 59, 0.1);
-  --offline-tint: rgba(242, 92, 84, 0.12);
-  --capturing-tint: rgba(69, 196, 233, 0.1);
+  --rec: #DC2F36;
+  --rec-hover: #C2242B;
+  --rec-soft: #FDECEC;
+  --ok: #1B8551;
+  --ok-soft: #E4F4EA;
+  --warn: #A86108;
+  --warn-soft: #FDF3E3;
 
-  --live-edge: rgba(62, 207, 142, 0.4);
-  --stalled-edge: rgba(229, 168, 59, 0.5);
-  --offline-edge: rgba(242, 92, 84, 0.5);
-  --capturing-edge: rgba(69, 196, 233, 0.4);
+  --live-bg: #0B111C;
 
-  --iris-tint: rgba(130, 140, 248, 0.12);
-  --iris-edge: rgba(130, 140, 248, 0.5);
+  --font: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
 
-  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, Segoe UI, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+  --fs-xs: 11.5px;
+  --fs-sm: 12.5px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 20px;
+  --fs-2xl: 24px;
 
-  --fs-display: 20px;
-  --fs-title: 12px;
-  --fs-body: 13px;
-  --fs-micro: 11px;
-  --fs-data: 12px;
-  --fs-data-lg: 18px;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
 
-  --fw-regular: 400;
-  --fw-medium: 500;
-  --fw-semibold: 600;
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s8: 32px;
 
-  --tr-title: 0.08em;
-  --tr-micro: 0.06em;
+  --shadow-1: 0 1px 2px rgba(16, 27, 44, 0.06), 0 1px 1px rgba(16, 27, 44, 0.04);
+  --shadow-2: 0 6px 18px -6px rgba(16, 27, 44, 0.18), 0 2px 6px rgba(16, 27, 44, 0.06);
+  --shadow-3: 0 18px 40px -12px rgba(16, 27, 44, 0.28);
 
-  --sp-1: 4px;
-  --sp-2: 8px;
-  --sp-3: 12px;
-  --sp-4: 16px;
-  --sp-5: 24px;
-  --sp-6: 32px;
-
-  --r-chip: 3px;
-  --r-control: 4px;
-  --r-panel: 8px;
-
-  --focus-ring: 0 0 0 2px var(--iris);
-  --spine-h: 2px;
+  --focus: 0 0 0 3px rgba(75, 79, 224, 0.32);
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
+}
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
