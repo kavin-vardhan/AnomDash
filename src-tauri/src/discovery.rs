@@ -120,6 +120,10 @@ pub fn discover(port: u16) -> Discovery {
     }
 }
 
+pub fn open_logs_for(pid: u32) -> Vec<PathBuf> {
+    open_log_paths(pid)
+}
+
 pub fn parse_token(log_text: &str) -> Option<String> {
     let mut state = LogState::default();
     state.feed_text(log_text);
@@ -182,7 +186,30 @@ fn inspect(pid: u32, port: u16, url: &str, processes: &[(u32, String)]) -> Inspe
     }
     endpoint.kind = kind_of(&endpoint.process_name).to_string();
     let editor = endpoint.kind == "editor";
-    let plan = plan_logs(editor, info.image.as_deref(), &info.command_line);
+    let mut plan = plan_logs(editor, info.image.as_deref(), &info.command_line);
+    let open_logs = open_logs_cached(pid, info.start);
+    for (index, path) in open_logs.iter().enumerate() {
+        let key = path.to_string_lossy().to_lowercase();
+        plan.candidates
+            .retain(|known| known.path.to_string_lossy().to_lowercase() != key);
+        let at = index.min(plan.candidates.len());
+        plan.candidates.insert(
+            at,
+            Candidate {
+                path: path.clone(),
+                primary: true,
+            },
+        );
+    }
+    if plan.project_name.is_empty() || (editor && plan.project_name.to_ascii_lowercase().starts_with("unrealeditor")) {
+        if let Some(stem) = open_logs.first().and_then(|p| p.file_stem()) {
+            let stem = stem.to_string_lossy().into_owned();
+            plan.project_name = match stem.rsplit_once('_') {
+                Some((head, tail)) if !head.is_empty() && !tail.is_empty() && tail.chars().all(|c| c.is_ascii_digit()) => head.to_string(),
+                _ => stem,
+            };
+        }
+    }
     endpoint.project_name = plan.project_name.clone();
     let who = format!("pid {pid} ({}, {})", endpoint.process_name, endpoint.kind);
     if plan.candidates.is_empty() {
@@ -355,7 +382,14 @@ fn plan_logs(editor: bool, image: Option<&Path>, command_line: &str) -> LogPlan 
         .and_then(Path::file_stem)
         .map(|stem| stem.to_string_lossy().into_owned())
         .unwrap_or_default();
-    let uproject = find_uproject(command_line, exe_dir);
+    let engine_root = exe_dir.and_then(|dir| dir.ancestors().nth(3)).map(Path::to_path_buf);
+    let uproject = find_uproject(command_line, exe_dir).filter(|p| p.is_file()).or_else(|| {
+        if !editor {
+            return None;
+        }
+        let root = engine_root.as_deref()?;
+        bare_project_uproject(command_line, root)
+    }).or_else(|| find_uproject(command_line, exe_dir));
     let stem = match (&uproject, editor) {
         (Some(path), _) => path
             .file_stem()
@@ -392,7 +426,15 @@ fn plan_logs(editor: bool, image: Option<&Path>, command_line: &str) -> LogPlan 
             }
         }
     } else if uproject.is_none() {
-        notes.push("the editor command line names no .uproject file".to_string());
+        notes.push("the editor command line names no .uproject file; searched the projects next to the engine".to_string());
+        if let Some(root) = engine_root.as_deref() {
+            for dir in native_project_dirs(root) {
+                let logs = dir.join("Saved").join("Logs");
+                if logs.is_dir() {
+                    push_unique_dir(&mut dirs, logs);
+                }
+            }
+        }
     }
     let project_logs = dirs.first().cloned().or_else(|| {
         exe_dir
@@ -444,6 +486,73 @@ fn plan_logs(editor: bool, image: Option<&Path>, command_line: &str) -> LogPlan 
         candidates,
         notes,
     }
+}
+
+fn bare_project_uproject(command_line: &str, root: &Path) -> Option<PathBuf> {
+    for argument in split_arguments(command_line).into_iter().skip(1) {
+        let argument = argument.trim().trim_matches('"');
+        if argument.is_empty() || argument.starts_with('-') || argument.contains(['\\', '/', ':', '=', '.']) {
+            continue;
+        }
+        for dir in native_project_dirs(root) {
+            let candidate = dir.join(format!("{argument}.uproject"));
+            if dir
+                .file_name()
+                .is_some_and(|n| n.to_string_lossy().eq_ignore_ascii_case(argument))
+                && candidate.is_file()
+            {
+                return Some(candidate);
+            }
+        }
+        let direct = root.join(argument).join(format!("{argument}.uproject"));
+        if direct.is_file() {
+            return Some(direct);
+        }
+        break;
+    }
+    None
+}
+
+fn native_project_dirs(root: &Path) -> Vec<PathBuf> {
+    let mut bases: Vec<PathBuf> = vec![root.to_path_buf()];
+    if let Ok(entries) = fs::read_dir(root) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let is_dirs_file = path
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("uprojectdirs"));
+            if !is_dirs_file {
+                continue;
+            }
+            if let Ok(text) = fs::read_to_string(&path) {
+                for line in text.lines() {
+                    let line = line.trim();
+                    if line.is_empty() || line.starts_with(';') {
+                        continue;
+                    }
+                    let base = root.join(line.trim_start_matches("./").trim_start_matches(".\\"));
+                    if base.is_dir() {
+                        push_unique_dir(&mut bases, base);
+                    }
+                }
+            }
+        }
+    }
+    let mut out: Vec<PathBuf> = Vec::new();
+    for base in bases {
+        if let Ok(entries) = fs::read_dir(&base) {
+            for entry in entries.flatten().take(400) {
+                let path = entry.path();
+                if path.is_dir() && path.join("Saved").join("Logs").is_dir() {
+                    let name = path.file_name().map(|n| n.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
+                    if name != "engine" {
+                        push_unique_dir(&mut out, path);
+                    }
+                }
+            }
+        }
+    }
+    out
 }
 
 fn push_unique_dir(dirs: &mut Vec<PathBuf>, dir: PathBuf) {
@@ -1202,6 +1311,189 @@ fn tcp_table(family: u32) -> Result<Vec<u32>, u32> {
         size = length.saturating_add(4096);
     }
     Err(ERROR_INSUFFICIENT_BUFFER.0)
+}
+
+mod raw {
+    use std::ffi::c_void;
+
+    #[link(name = "ntdll")]
+    extern "system" {
+        pub fn NtQuerySystemInformation(class: i32, info: *mut c_void, length: u32, returned: *mut u32) -> i32;
+    }
+
+    #[link(name = "kernel32")]
+    extern "system" {
+        pub fn OpenProcess(access: u32, inherit: i32, pid: u32) -> isize;
+        pub fn GetCurrentProcess() -> isize;
+        pub fn DuplicateHandle(
+            source_process: isize,
+            source: isize,
+            target_process: isize,
+            target: *mut isize,
+            access: u32,
+            inherit: i32,
+            options: u32,
+        ) -> i32;
+        pub fn GetFileType(handle: isize) -> u32;
+        pub fn GetFinalPathNameByHandleW(handle: isize, buffer: *mut u16, length: u32, flags: u32) -> u32;
+        pub fn CloseHandle(handle: isize) -> i32;
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct HandleEntry {
+    object: usize,
+    unique_process_id: usize,
+    handle_value: usize,
+    granted_access: u32,
+    creator_back_trace_index: u16,
+    object_type_index: u16,
+    handle_attributes: u32,
+    reserved: u32,
+}
+
+const SYSTEM_EXTENDED_HANDLE_INFORMATION: i32 = 64;
+const STATUS_INFO_LENGTH_MISMATCH: i32 = 0xC000_0004_u32 as i32;
+const PROCESS_DUP_HANDLE: u32 = 0x0040;
+const DUPLICATE_SAME_ACCESS: u32 = 0x0002;
+const FILE_TYPE_DISK: u32 = 0x0001;
+const OPEN_LOG_TIMEOUT: Duration = Duration::from_secs(3);
+
+fn system_handles() -> Option<Vec<HandleEntry>> {
+    let mut size: usize = 4 << 20;
+    for _ in 0..8 {
+        let mut buffer = vec![0u64; size / 8];
+        let mut needed = 0u32;
+        let status = unsafe {
+            raw::NtQuerySystemInformation(
+                SYSTEM_EXTENDED_HANDLE_INFORMATION,
+                buffer.as_mut_ptr().cast(),
+                (buffer.len() * 8) as u32,
+                &mut needed,
+            )
+        };
+        if status >= 0 {
+            let header = 2 * size_of::<usize>();
+            let available = (buffer.len() * 8).saturating_sub(header) / size_of::<HandleEntry>();
+            let count = (buffer[0] as usize).min(available);
+            let base = unsafe { buffer.as_ptr().cast::<u8>().add(header).cast::<HandleEntry>() };
+            return Some(
+                (0..count)
+                    .map(|index| unsafe { std::ptr::read_unaligned(base.add(index)) })
+                    .collect(),
+            );
+        }
+        if status != STATUS_INFO_LENGTH_MISMATCH {
+            return None;
+        }
+        size = (needed as usize).max(size * 2) + (1 << 20);
+    }
+    None
+}
+
+fn clean_final_path(text: String) -> String {
+    if let Some(rest) = text.strip_prefix(r"\\?\UNC\") {
+        return format!(r"\\{rest}");
+    }
+    if let Some(rest) = text.strip_prefix(r"\\?\") {
+        return rest.to_string();
+    }
+    text
+}
+
+fn open_log_paths(pid: u32) -> Vec<PathBuf> {
+    use std::os::windows::io::AsRawHandle;
+    let Ok(exe) = std::env::current_exe() else {
+        return Vec::new();
+    };
+    let Ok(probe) = File::open(&exe) else {
+        return Vec::new();
+    };
+    let own_pid = std::process::id() as usize;
+    let probe_value = probe.as_raw_handle() as usize;
+    let Some(entries) = system_handles() else {
+        return Vec::new();
+    };
+    let Some(file_type) = entries
+        .iter()
+        .find(|e| e.unique_process_id == own_pid && e.handle_value == probe_value)
+        .map(|e| e.object_type_index)
+    else {
+        return Vec::new();
+    };
+    drop(probe);
+    let process = unsafe { raw::OpenProcess(PROCESS_DUP_HANDLE, 0, pid) };
+    if process == 0 {
+        return Vec::new();
+    }
+    let me = unsafe { raw::GetCurrentProcess() };
+    let mut found: Vec<PathBuf> = Vec::new();
+    for entry in entries
+        .iter()
+        .filter(|e| e.unique_process_id == pid as usize && e.object_type_index == file_type)
+    {
+        let mut duplicate: isize = 0;
+        let ok = unsafe {
+            raw::DuplicateHandle(process, entry.handle_value as isize, me, &mut duplicate, 0, 0, DUPLICATE_SAME_ACCESS)
+        };
+        if ok == 0 || duplicate == 0 {
+            continue;
+        }
+        if unsafe { raw::GetFileType(duplicate) } == FILE_TYPE_DISK {
+            let mut buffer = vec![0u16; 1024];
+            let length = unsafe { raw::GetFinalPathNameByHandleW(duplicate, buffer.as_mut_ptr(), buffer.len() as u32, 0) };
+            if length > 0 && (length as usize) < buffer.len() {
+                let path = clean_final_path(String::from_utf16_lossy(&buffer[..length as usize]));
+                let lower = path.to_ascii_lowercase();
+                if (lower.ends_with(".log") || lower.ends_with(".txt"))
+                    && !lower.contains("-backup-")
+                    && !found.iter().any(|p| p.to_string_lossy().to_ascii_lowercase() == lower)
+                {
+                    found.push(PathBuf::from(path));
+                }
+            }
+        }
+        unsafe {
+            raw::CloseHandle(duplicate);
+        }
+        if found.len() >= 16 {
+            break;
+        }
+    }
+    unsafe {
+        raw::CloseHandle(process);
+    }
+    found.sort_by_key(|p| {
+        let lower = p.to_string_lossy().to_ascii_lowercase();
+        (!lower.contains("\\saved\\logs\\"), !lower.ends_with(".log"))
+    });
+    found
+}
+
+fn open_logs_cached(pid: u32, started: Option<SystemTime>) -> Vec<PathBuf> {
+    use std::collections::HashMap;
+    use std::sync::{mpsc, Mutex, OnceLock};
+    static CACHE: OnceLock<Mutex<HashMap<u32, (Option<SystemTime>, Vec<PathBuf>)>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Ok(map) = cache.lock() {
+        if let Some((start, paths)) = map.get(&pid) {
+            if *start == started && paths.iter().all(|p| p.is_file()) {
+                return paths.clone();
+            }
+        }
+    }
+    let (sender, receiver) = mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = sender.send(open_log_paths(pid));
+    });
+    let paths = receiver.recv_timeout(OPEN_LOG_TIMEOUT).unwrap_or_default();
+    if !paths.is_empty() {
+        if let Ok(mut map) = cache.lock() {
+            map.insert(pid, (started, paths.clone()));
+        }
+    }
+    paths
 }
 
 fn table_rows<T: Copy>(buffer: &[u32]) -> Vec<T> {
