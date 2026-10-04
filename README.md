@@ -1,5 +1,17 @@
 # Anomaly Dashboard
 
+## v2 (2026-10-04): one exe, the current client deliverable
+`AnomalyDashboard.exe` is a single Tauri v2 app. The client copies it anywhere and double-clicks it: no Setup.bat, Python, ffmpeg, config.json or token.
+- **Connection:** it finds the game or editor listening on `127.0.0.1:8077` and reads the access key from that process's own Unreal log.
+- **Screens:** Capture, Library and Settings.
+- **Outputs:** frames, annotation.json and labels.jsonl come with every capture. Target masks wait in a hidden `.dashboard` folder inside each capture; they are released, together with the video (Windows Media Foundation H.264) and the labelled previews (Rust port of the overlay inspector), only when the user selects captures and presses **Generate**.
+- **Build:** `npm install`, then `npx tauri build` (needs Rust ≥ 1.88). The output is `src-tauri/target/release/AnomalyDashboard.exe`.
+- **Dev:** `npm run dev` runs the UI in a browser with a mock game and mock backend (`src/mock`). Add `?offline` to see the not-connected screen.
+- **Client guide:** `docs/DASHBOARD-QUICKSTART.md`. Design and plan: `docs/sessions/2026-10-04-024-desktop-v2.md`.
+- **The previous browser dashboard** (Setup.bat / Run.bat / host-tools, Python) is preserved at tag **`dashboard-v1-browser`**. The v2 frontend runs only inside the exe, so do not rebuild the old browser bundle from this branch.
+
+Everything below describes v1 and is kept for history.
+
 External control dashboard for the **AnomalyInjector** plugin's in-game control server. A **pure localhost
 client** — it connects to the in-game WebSocket server at `ws://127.0.0.1:8077` and never touches the network
 at runtime. (Host tooling, like the MCP bridge; its own repo, independent of the plugin.)
