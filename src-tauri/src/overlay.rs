@@ -805,6 +805,367 @@ impl Legend {
     }
 }
 
+const OUTLINE_RED: Rgb = [255, 32, 32];
+const OUTLINE_HALO: f32 = 0.55;
+const TAG_PAD_X: i32 = 6;
+const CAT_MASK: &str = "MASK_OUTLINE";
+const CAT_BOX: &str = "BOX_FALLBACK";
+
+struct OutlineItem {
+    mask_value: u8,
+    rect: Option<[i32; 4]>,
+    name: String,
+}
+
+struct OutlineFrame {
+    image: PathBuf,
+    mask: Option<PathBuf>,
+    output_name: String,
+    items: Vec<OutlineItem>,
+}
+
+pub fn anomaly_display_name(id: &str) -> String {
+    match id {
+        "blinking" | "blink" => "Blinking".into(),
+        "missing_object" => "Missing object".into(),
+        "missing_texture" => "Missing texture".into(),
+        "corrupted_texture" => "Corrupted texture".into(),
+        "lod_popping" => "LOD popping".into(),
+        "camera_clipping" => "Camera clipping".into(),
+        "stuck_low_mip" => "Blurry texture".into(),
+        "uv_corruption" => "UV corruption".into(),
+        "normal_corruption" => "Normal corruption".into(),
+        other => {
+            let spaced = other.replace('_', " ");
+            let mut chars = spaced.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                None => String::from("Anomaly"),
+            }
+        }
+    }
+}
+
+fn resolve_mask(session_dir: &Path, rel: &str) -> Option<PathBuf> {
+    if rel.is_empty() {
+        return None;
+    }
+    let rel_os = rel.replace('/', "\\");
+    let visible = session_dir.join(&rel_os);
+    if visible.is_file() {
+        return Some(visible);
+    }
+    let pending = session_dir.join(".dashboard").join("pending").join(&rel_os);
+    if pending.is_file() {
+        return Some(pending);
+    }
+    None
+}
+
+fn plan_outlines(session_dir: &Path) -> Result<(usize, Vec<OutlineFrame>), String> {
+    if !session_dir.is_dir() {
+        return Err(format!(
+            "The capture folder {} could not be found, so labelled previews can't be drawn.",
+            session_dir.display()
+        ));
+    }
+    let sidecar = session_dir.join("labels.jsonl");
+    if !sidecar.is_file() {
+        return Err(NO_LABELS.to_string());
+    }
+    let Annotation { events, .. } = load_annotation(session_dir)?;
+    let rows = load_rows(&sidecar)?;
+    let empty = Value::String(String::new());
+    let mut frames = Vec::new();
+    for rec in &rows {
+        let frame_key = match rec.get("session_index") {
+            Some(v) => v,
+            None => rec.get("frame_index").unwrap_or(&Value::Null),
+        };
+        let img_name = match rec.get("image") {
+            Some(Value::String(s)) => s.as_str(),
+            _ => "",
+        };
+        let mask_rel = match rec.get("mask_file") {
+            Some(Value::String(s)) => s.as_str(),
+            _ => "",
+        };
+        let mut items = Vec::new();
+        for a in list_of(rec.get("anomalies")) {
+            let a = match a {
+                Value::Object(m) => m,
+                _ => continue,
+            };
+            let engine_id = a.get("id").unwrap_or(&empty);
+            let target = a.get("target_name").unwrap_or(&empty);
+            let (cat, _) = classify(frame_key, engine_id, target, events.as_deref(), false);
+            if cat != CAT_SHIPPED {
+                continue;
+            }
+            let mask_value = a
+                .get("mask_value")
+                .and_then(integral)
+                .filter(|v| (1..=255).contains(v))
+                .map(|v| v as u8)
+                .unwrap_or(0);
+            let rect = a.get("bbox_px").and_then(four_numbers).and_then(|[x, y, w, h]| {
+                if w > 0.0 && h > 0.0 {
+                    Some([x as i32, y as i32, (x + w) as i32, (y + h) as i32])
+                } else {
+                    None
+                }
+            });
+            let id = match engine_id {
+                Value::String(s) => s.clone(),
+                other => py_str(other),
+            };
+            items.push(OutlineItem {
+                mask_value,
+                rect,
+                name: anomaly_display_name(&id),
+            });
+        }
+        if items.is_empty() {
+            continue;
+        }
+        frames.push(OutlineFrame {
+            image: session_dir.join(img_name),
+            mask: resolve_mask(session_dir, mask_rel),
+            output_name: format!("{}_annotated.png", py_stem(img_name)),
+            items,
+        });
+    }
+    Ok((rows.len(), frames))
+}
+
+fn region_bounds(mask: &image::GrayImage, value: u8) -> Option<[i32; 4]> {
+    let (w, h) = mask.dimensions();
+    let raw = mask.as_raw();
+    let (mut x0, mut y0, mut x1, mut y1) = (u32::MAX, u32::MAX, 0u32, 0u32);
+    for y in 0..h {
+        let row = &raw[(y * w) as usize..((y + 1) * w) as usize];
+        for (x, &v) in row.iter().enumerate() {
+            if v == value {
+                let x = x as u32;
+                x0 = x0.min(x);
+                x1 = x1.max(x);
+                y0 = y0.min(y);
+                y1 = y1.max(y);
+            }
+        }
+    }
+    if x0 == u32::MAX {
+        None
+    } else {
+        Some([x0 as i32, y0 as i32, x1 as i32, y1 as i32])
+    }
+}
+
+fn trace_outline(img: &mut RgbImage, mask: &image::GrayImage, value: u8, bounds: [i32; 4]) {
+    let (mw, mh) = (mask.width() as i32, mask.height() as i32);
+    let (iw, ih) = (img.width() as i32, img.height() as i32);
+    let sx = iw as f32 / mw as f32;
+    let sy = ih as f32 / mh as f32;
+    let inside = |x: i32, y: i32| x >= 0 && y >= 0 && x < mw && y < mh && mask.get_pixel(x as u32, y as u32).0[0] == value;
+    let x_from = (bounds[0] - 3).max(0);
+    let x_to = (bounds[2] + 3).min(mw - 1);
+    let y_from = (bounds[1] - 3).max(0);
+    let y_to = (bounds[3] + 3).min(mh - 1);
+    let mut ring1: Vec<(i32, i32)> = Vec::new();
+    let mut edge: Vec<(i32, i32)> = Vec::new();
+    for y in y_from..=y_to {
+        for x in x_from..=x_to {
+            let here = inside(x, y);
+            let touches = |want: bool| {
+                [(1, 0), (-1, 0), (0, 1), (0, -1)].iter().any(|(dx, dy)| inside(x + dx, y + dy) == want)
+            };
+            if here && touches(false) {
+                edge.push((x, y));
+            } else if !here && touches(true) {
+                ring1.push((x, y));
+            }
+        }
+    }
+    let mut seen: std::collections::HashSet<(i32, i32)> = ring1.iter().copied().collect();
+    let grow = |from: &Vec<(i32, i32)>, seen: &mut std::collections::HashSet<(i32, i32)>| -> Vec<(i32, i32)> {
+        let mut next = Vec::new();
+        for &(x, y) in from {
+            for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                let q = (x + dx, y + dy);
+                if !inside(q.0, q.1) && seen.insert(q) {
+                    next.push(q);
+                }
+            }
+        }
+        next
+    };
+    let ring2 = grow(&ring1, &mut seen);
+    let halo = grow(&ring2, &mut seen);
+    ring1.extend(ring2);
+    let map = |x: i32, y: i32| -> (i32, i32, i32, i32) {
+        let ax = (x as f32 * sx).floor() as i32;
+        let ay = (y as f32 * sy).floor() as i32;
+        let bx = (((x + 1) as f32 * sx).ceil() as i32).max(ax + 1);
+        let by = (((y + 1) as f32 * sy).ceil() as i32).max(ay + 1);
+        (ax, ay, bx, by)
+    };
+    for &(x, y) in &halo {
+        let (ax, ay, bx, by) = map(x, y);
+        for py in ay..by {
+            for px in ax..bx {
+                blend(img, px, py, BLACK, OUTLINE_HALO);
+            }
+        }
+    }
+    for &(x, y) in edge.iter().chain(ring1.iter()) {
+        let (ax, ay, bx, by) = map(x, y);
+        for py in ay..by {
+            for px in ax..bx {
+                put(img, px, py, OUTLINE_RED);
+            }
+        }
+    }
+}
+
+fn dashed_rect(img: &mut RgbImage, rect: [i32; 4]) {
+    let [x0, y0, x1, y1] = rect;
+    let on = |i: i32| (i / 8) % 2 == 0;
+    for t in 0..3 {
+        for x in x0..=x1 {
+            if on(x - x0) {
+                put(img, x, y0 + t, OUTLINE_RED);
+                put(img, x, y1 - t, OUTLINE_RED);
+            }
+        }
+        for y in y0..=y1 {
+            if on(y - y0) {
+                put(img, x0 + t, y, OUTLINE_RED);
+                put(img, x1 - t, y, OUTLINE_RED);
+            }
+        }
+    }
+}
+
+fn outline_tag(img: &mut RgbImage, kit: &TextKit, text: &str, anchor: [i32; 4]) {
+    let width = kit.width(text).ceil() as i32 + TAG_PAD_X * 2;
+    let (iw, ih) = (img.width() as i32, img.height() as i32);
+    let mut x = anchor[0].max(0);
+    if x + width > iw {
+        x = (iw - width).max(0);
+    }
+    let mut y = anchor[1] - ROW_H - 3;
+    if y < 0 {
+        y = (anchor[1] + 3).min(ih - ROW_H).max(0);
+    }
+    fill_rect(img, x, y, x + width - 1, y + ROW_H - 1, OUTLINE_RED);
+    kit.draw(img, (x + TAG_PAD_X) as f32, y as f32, text, WHITE);
+}
+
+pub fn render_outlines(
+    session_dir: &Path,
+    out_dir: &Path,
+    progress: &(dyn Fn(u32, u32) + Sync),
+    cancel: &AtomicBool,
+) -> Result<OverlayReport, String> {
+    let (total_rows, frames) = plan_outlines(session_dir)?;
+    if let Ok(entries) = fs::read_dir(out_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
+            if name.starts_with("frame_") && name.ends_with("_annotated.png") {
+                let _ = fs::remove_file(entry.path());
+            }
+        }
+    }
+    fs::create_dir_all(out_dir).map_err(|e| {
+        format!(
+            "Could not create the preview folder {}: {}. Check that the disk has free space and that the folder is not read-only.",
+            out_dir.display(),
+            e
+        )
+    })?;
+    let total = to_u32(total_rows);
+    let kit = TextKit::load();
+    let done = Mutex::new(total.saturating_sub(to_u32(frames.len())));
+    if let Ok(d) = done.lock() {
+        progress(*d, total);
+    }
+    let written = AtomicU32::new(0);
+    let outlined = AtomicU32::new(0);
+    let boxed = AtomicU32::new(0);
+    frames.par_iter().try_for_each(|frame| -> Result<(), String> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err("cancelled".to_string());
+        }
+        if frame.image.is_file() {
+            let decoded = ImageReader::open(&frame.image).ok().and_then(|r| r.with_guessed_format().ok()).and_then(|r| r.decode().ok());
+            if let Some(decoded) = decoded {
+                let mut img = decoded.into_rgb8();
+                let mask = frame
+                    .mask
+                    .as_ref()
+                    .and_then(|m| ImageReader::open(m).ok())
+                    .and_then(|r| r.with_guessed_format().ok())
+                    .and_then(|r| r.decode().ok())
+                    .map(|d| d.into_luma8());
+                let mut tags: Vec<(String, [i32; 4])> = Vec::new();
+                for item in &frame.items {
+                    let from_mask = match (&mask, item.mask_value) {
+                        (Some(m), v) if v > 0 => region_bounds(m, v).map(|b| (m, b)),
+                        _ => None,
+                    };
+                    match from_mask {
+                        Some((m, b)) => {
+                            trace_outline(&mut img, m, item.mask_value, b);
+                            let sx = img.width() as f32 / m.width() as f32;
+                            let sy = img.height() as f32 / m.height() as f32;
+                            let scaled = [
+                                (b[0] as f32 * sx) as i32,
+                                (b[1] as f32 * sy) as i32,
+                                (b[2] as f32 * sx) as i32,
+                                (b[3] as f32 * sy) as i32,
+                            ];
+                            tags.push((item.name.clone(), scaled));
+                            outlined.fetch_add(1, Ordering::Relaxed);
+                        }
+                        None => {
+                            if let Some(r) = item.rect {
+                                dashed_rect(&mut img, r);
+                                tags.push((item.name.clone(), r));
+                                boxed.fetch_add(1, Ordering::Relaxed);
+                            }
+                        }
+                    }
+                }
+                if let Some(k) = kit.as_ref() {
+                    for (name, anchor) in &tags {
+                        outline_tag(&mut img, k, name, *anchor);
+                    }
+                }
+                if !tags.is_empty() {
+                    write_png(&out_dir.join(&frame.output_name), &img)?;
+                    written.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+        }
+        if let Ok(mut d) = done.lock() {
+            *d += 1;
+            progress(*d, total);
+        }
+        Ok(())
+    })?;
+    let mut by_category = BTreeMap::new();
+    by_category.insert(CAT_MASK.to_string(), outlined.load(Ordering::Relaxed));
+    by_category.insert(CAT_BOX.to_string(), boxed.load(Ordering::Relaxed));
+    Ok(OverlayReport {
+        total_frames: total,
+        frames_with_boxes: to_u32(frames.len()),
+        images_written: written.load(Ordering::Relaxed),
+        red_boxes: outlined.load(Ordering::Relaxed) + boxed.load(Ordering::Relaxed),
+        amber_boxes: 0,
+        by_category,
+    })
+}
+
 fn legend_patch(kit: Option<&TextKit>, with_amber: bool) -> RgbImage {
     let mut lines: Vec<(Rgb, &str)> = vec![(RED, LEGEND_RED)];
     if with_amber {

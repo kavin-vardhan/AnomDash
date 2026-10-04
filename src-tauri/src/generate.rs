@@ -113,7 +113,7 @@ pub fn run(req: GenerateRequest, emit: impl Fn(Progress) + Send + Sync + 'static
                     }
                 };
                 emit(p(s, "previews", "running", 0, 0, "Drawing labelled previews"));
-                match overlay::render_previews(&session, &sessions::preview_dir(&session), &progress, &CANCEL) {
+                match overlay::render_outlines(&session, &sessions::preview_dir(&session), &progress, &CANCEL) {
                     Ok(r) => {
                         notes.push(format!("{} previews", r.images_written));
                         let mut st = sessions::read_state(&session);

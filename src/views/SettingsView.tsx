@@ -111,6 +111,8 @@ export function SettingsView() {
             <dd>Encoded on this PC with Windows’ built-in H.264 encoder</dd>
             <dt>Target masks</dt>
             <dd>Recorded during every capture, released when you generate them</dd>
+            <dt>Previews</dt>
+            <dd>Each anomaly outlined in red along its exact pixels and named; dashed box where no mask exists</dd>
           </dl>
         </Card>
       </div>

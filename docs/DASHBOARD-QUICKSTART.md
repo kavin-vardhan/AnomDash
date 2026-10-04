@@ -30,7 +30,11 @@ Open **Library**, tick the captures you want, choose the outputs in the bar at t
 |---|---|
 | **Video** | `Video_Clip/<session>.mp4`, encoded on this PC at the capture's true frame rate |
 | **Target masks** | `target_mask/` plus `mask_map.json`: one greyscale PNG per frame, marking the anomaly's pixels |
-| **Labelled previews** | `annotated/`: copies of the labelled frames with the label boxes drawn on, for checking by eye |
+| **Labelled previews** | `annotated/`: copies of the labelled frames, with each anomaly outlined in red and named (for example "Corrupted texture") |
+
+In the labelled previews:
+- **A solid red outline** follows the object's exact visible pixels, taken from its target mask.
+- **A dashed red box** means no mask was recorded for that object (for example Nanite meshes). The box shows the label's approximate area.
 
 Masks are recorded during every capture, but they stay in a hidden working folder inside the capture until you generate them.
 
