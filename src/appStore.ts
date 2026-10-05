@@ -21,6 +21,7 @@ export interface CaptureForm {
   mode: 'auto' | 'targeted'
   anomalyId: string
   frames: string
+  customLength: boolean
   format: 'png' | 'jpeg'
   outputHeight: string
   seed: string
@@ -55,7 +56,7 @@ interface AppState {
 }
 
 export const useApp = create<AppState>((set) => ({
-  form: { mode: 'auto', anomalyId: '', frames: '300', format: 'png', outputHeight: '', seed: '' },
+  form: { mode: 'auto', anomalyId: '', frames: '300', customLength: false, format: 'png', outputHeight: '', seed: '' },
   setForm: (patch) => set((st) => ({ form: { ...st.form, ...patch } })),
   view: 'capture',
   settings: null,

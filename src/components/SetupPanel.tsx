@@ -310,13 +310,15 @@ export function SetupPanel() {
     return o !== undefined ? !!o.value : !!pool?.[id]
   })
   const frames = Number(form.frames)
-  const custom = !LENGTHS.some((l) => l.value === form.frames)
+  const custom = form.customLength
+  const customMissing = custom && !(frames > 0)
 
   let blocker = ''
   if (!live) blocker = 'Waiting for the game'
   else if (targeted && !selected) blocker = 'Pick an object first'
   else if (targeted && !form.anomalyId) blocker = 'Pick an anomaly first'
   else if (!targeted && !poolOn) blocker = 'Turn on at least one anomaly'
+  else if (customMissing) blocker = 'Enter a frame count'
 
   const start = () => {
     const opts: Record<string, unknown> = { format: form.format }
@@ -355,11 +357,11 @@ export function SetupPanel() {
           />
           {targeted ? <OneObject /> : <RandomMix />}
         </Section>
-        <Section title="Length" aside={<span className="muted">{frames > 0 ? `${frames} frames at 30 fps` : 'Runs until you press Stop'}</span>}>
+        <Section title="Length" aside={<span className="muted">{customMissing ? 'Enter a frame count' : frames > 0 ? `${frames} frames at 30 fps` : 'Runs until you press Stop'}</span>}>
           <Segmented
             ariaLabel="Capture length"
             value={custom ? 'custom' : form.frames}
-            onChange={(v) => setForm({ frames: v === 'custom' ? String(frames > 0 ? frames : 600) : v })}
+            onChange={(v) => setForm(v === 'custom' ? { customLength: true, frames: String(frames > 0 ? frames : 600) } : { customLength: false, frames: v })}
             options={[...LENGTHS, { value: 'custom', label: 'Custom' }]}
           />
           {custom && (
