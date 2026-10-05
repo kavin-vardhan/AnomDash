@@ -1,6 +1,6 @@
-# Anomaly Dashboard: what's new
+# What's new: the Anomaly Dashboard and three new anomalies
 
-The dashboard has been rebuilt as a single Windows app. It captures and labels exactly as before, but it is much simpler to set up and use.
+The dashboard has been rebuilt as a single Windows app. It captures and labels exactly as before, but it is much simpler to set up and use. This delivery also adds three new anomaly types: **Blurry texture**, **UV corruption** and **Normal corruption** (section 6).
 
 ## At a glance
 
@@ -11,6 +11,7 @@ The dashboard has been rebuilt as a single Windows app. It captures and labels e
 | **Connecting to the game** | The access key came from `config.json` | It finds the running game and its access key by itself |
 | **Videos, masks and previews** | Made automatically for every capture | Made only when you ask, for the captures you choose |
 | **Labelled previews** | Boxes that were often only roughly placed | A red outline that follows the anomaly's exact pixels, with its name |
+| **Anomaly types** | — | Three new ones: Blurry texture, UV corruption and Normal corruption |
 
 ## 1. One app, nothing to install
 
@@ -60,11 +61,23 @@ To remove a capture you don't need, click **⋯ → Move to Recycle Bin** on its
 - **Solid red outline:** follows the object's exact visible pixels, taken from its target mask, and names the anomaly (for example "Corrupted texture").
 - **Dashed red box:** used when no mask was recorded for that object. It shows the label's approximate area.
 
-## 6. Recent fixes
+## 6. Three new anomalies
 
-- **Custom length** now works whichever length you had selected before. It used to work only after choosing "Until I stop".
-- If the Custom box is empty, **Start capture** stays disabled and shows "Enter a frame count". It no longer starts an endless capture.
-- Connecting is more reliable when the game is started from the editor or from Visual Studio.
+All three are **off by default**. Switch them on in **Random mix**, where they're listed with the other anomaly types, or choose one in **One object**. Like every anomaly, each gets labels, a target mask and a labelled preview.
+
+| Anomaly | What you see | Name in the labels | Variants (recorded as `anomaly_subtype`) |
+|---|---|---|---|
+| **Blurry texture** | One object's textures stay low-resolution, as if they never finished loading. The rest of the scene stays sharp. | `stuck_low_mip` | — |
+| **UV corruption** | The object's textures land in the wrong place. The object's shape doesn't change. | `uv_corruption` | `tile`: the texture repeats many times across the surface<br>`scramble`: the texture is cut into squares and shuffled |
+| **Normal corruption** | Surface detail is lit from the wrong side, so bumps look like dents. Colour and shape don't change. | `normal_corruption` | `invert`: detail lit from the opposite side<br>`green_flip`: detail lit with top and bottom swapped |
+
+**Good to know:**
+- **Only the chosen object changes.** If its texture is shared with other objects, they stay as they were.
+- **Blurry texture only picks objects big enough on screen** for the blur to be visible; smaller objects are skipped.
+- **Some objects are skipped:** objects that use virtual textures, and (by default) objects drawn with Nanite.
+- **The change can be subtle.** On a plain or faint texture, or for Normal corruption under flat or head-on lighting, frames can be labelled even though the change is hard to see. `change_evidence.jsonl` in each capture folder shows how much of the object actually changed, so these events can be filtered out.
+- **Blurry texture never appears on the same frame** as UV corruption or Normal corruption.
+- **To see how many objects qualify,** run `IAI.TexCorrupt.Census` in the game console. It counts the objects in view; add `all` to count the whole level.
 
 ## Please note
 
@@ -73,6 +86,7 @@ To remove a capture you don't need, click **⋯ → Move to Recycle Bin** on its
   - Windows 10 or 11.
   - A **Development** or **Test** build of the game. The capture features aren't included in Shipping builds.
   - `IAI.Server.Start` run in the game, by hand or from the launch command.
+- **For the crispest start and end of each anomaly, use FXAA anti-aliasing.** With TAA or TSR the picture can trail the label by a frame or two. Run `r.AntiAliasingMethod 1` in the console, or add it to the launch command: `-ExecCmds="IAI.Server.Start, r.AntiAliasingMethod 1"`.
 
 ## What a capture folder contains
 
